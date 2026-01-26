@@ -6,6 +6,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Component
 @RequiredArgsConstructor
 public class DataInitializer {
@@ -14,9 +16,18 @@ public class DataInitializer {
 
     @PostConstruct
     public void init() {
-        createRoleIfNotExists("ADMIN", "Administrator");
-        createRoleIfNotExists("LEADER", "Team leader");
-        createRoleIfNotExists("MEMBER", "Team member");
+        Map<String, String> roles = Map.of(
+                "ADMIN", "Administrator",
+                "USER", "User",
+                "BUSINESS", "Business",
+                "LEADER", "Team leader",
+                "CELEBRITY", "Celebrity",
+                "RESTAURANT", "Restaurant",
+                "POLITICIAN", "Politician",
+                "OTHER", "Other",
+                "GUEST", "Guest"
+        );
+        roles.forEach(this::createRoleIfNotExists);
     }
 
     private void createRoleIfNotExists(String name, String description) {
