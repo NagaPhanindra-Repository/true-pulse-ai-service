@@ -35,6 +35,12 @@ public class ActionItemServiceImpl implements ActionItemService {
         a.setDueDate(dto.getDueDate());
         a.setRetro(retro);
         a.setAssignedUser(assigned);
+        // Set assigned user name if user is assigned
+        if (assigned != null) {
+            a.setAssignedUserName(assigned.getUserName());
+        } else if (dto.getAssignedUserName() != null) {
+            a.setAssignedUserName(dto.getAssignedUserName());
+        }
         // Status and completed are set by @PrePersist
         return toDto(actionItemRepository.save(a));
     }
@@ -67,7 +73,12 @@ public class ActionItemServiceImpl implements ActionItemService {
             a.setRetro(fetchRetro(dto.getRetroId()));
         }
         if (dto.getAssignedUserId() != null && (a.getAssignedUser() == null || !dto.getAssignedUserId().equals(a.getAssignedUser().getId()))) {
-            a.setAssignedUser(fetchUser(dto.getAssignedUserId()));
+            User assigned = fetchUser(dto.getAssignedUserId());
+            a.setAssignedUser(assigned);
+            a.setAssignedUserName(assigned.getUserName());
+        }
+        if (dto.getAssignedUserName() != null && dto.getAssignedUserId() == null) {
+            a.setAssignedUserName(dto.getAssignedUserName());
         }
         a.setCompleted(dto.isCompleted());
         if (dto.getStatus() != null) a.setStatus(ActionItem.ActionItemStatus.valueOf(dto.getStatus()));
@@ -81,6 +92,13 @@ public class ActionItemServiceImpl implements ActionItemService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ActionItem not found");
         }
         actionItemRepository.deleteById(id);
+    }
+
+    @Override
+    public List<ActionItemDto> getActionItemsByRetroId(Long retroId) {
+        return actionItemRepository.findByRetroId(retroId).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
     private Retro fetchRetro(Long id) {
@@ -102,6 +120,7 @@ public class ActionItemServiceImpl implements ActionItemService {
     private ActionItemDto toDto(ActionItem a) {
         Long retroId = a.getRetro() != null ? a.getRetro().getId() : null;
         Long userId = a.getAssignedUser() != null ? a.getAssignedUser().getId() : null;
+        String userName = a.getAssignedUserName();
         return new ActionItemDto(
                 a.getId(),
                 a.getDescription(),
@@ -110,6 +129,7 @@ public class ActionItemServiceImpl implements ActionItemService {
                 a.getStatus().toString(),
                 retroId,
                 userId,
+                userName,
                 a.getCompletedAt(),
                 a.getCreatedAt(),
                 a.getUpdatedAt()

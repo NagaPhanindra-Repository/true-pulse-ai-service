@@ -10,5 +10,6 @@ public interface ActionItemService {
     List<ActionItemDto> getAll();
     ActionItemDto update(Long id, ActionItemDto dto);
     void delete(Long id);
+    List<ActionItemDto> getActionItemsByRetroId(Long retroId);
 }
 

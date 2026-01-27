@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS action_items (
   status VARCHAR(50) NOT NULL,
   retro_id BIGINT NOT NULL REFERENCES retros(id) ON DELETE CASCADE,
   assigned_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  assigned_user_name VARCHAR(100),
   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE,
   completed_at TIMESTAMP WITH TIME ZONE

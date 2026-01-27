@@ -35,6 +35,9 @@ public class ActionItem {
     @JoinColumn(name = "assigned_user_id")
     private User assignedUser;
 
+    @Column
+    private String assignedUserName;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

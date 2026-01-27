@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -158,6 +159,15 @@ public class RetroServiceImpl implements RetroService {
     @Transactional(readOnly = true)
     public List<RetroDto> getAll() {
         return retroRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RetroDto> getRetrosByUserId(Long userId) {
+        return retroRepository.findByUserId(userId).stream()
+                .map(this::toDto)
+                .sorted(Comparator.comparing(RetroDto::getCreatedAt).reversed())
+                .collect(Collectors.toList());
     }
 
     @Override

@@ -18,6 +18,7 @@ public class ActionItemDto {
     private String status; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
     private Long retroId;
     private Long assignedUserId;
+    private String assignedUserName;
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

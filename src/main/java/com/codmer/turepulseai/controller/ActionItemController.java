@@ -27,6 +27,17 @@ public class ActionItemController {
         return ResponseEntity.ok(actionItemService.getAll());
     }
 
+    /**
+     * Get all action items for a specific retro
+     *
+     * @param retroId the ID of the retro
+     * @return List of ActionItemDto objects for the specified retro
+     */
+    @GetMapping("/retro/{retroId}")
+    public ResponseEntity<List<ActionItemDto>> getActionItemsByRetroId(@PathVariable Long retroId) {
+        return ResponseEntity.ok(actionItemService.getActionItemsByRetroId(retroId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ActionItemDto> get(@PathVariable Long id) {
         return ResponseEntity.ok(actionItemService.getById(id));

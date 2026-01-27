@@ -17,5 +17,10 @@ public interface RetroService {
      * action items, and questions - used for shared retro link view
      */
     RetroDetailDto getRetroDetails(Long retroId);
+
+    /**
+     * Get all retros created by a specific user
+     */
+    List<RetroDto> getRetrosByUserId(Long userId);
 }
 
