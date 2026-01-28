@@ -1,0 +1,662 @@
+{
+  "info": {
+    "_postman_id": "truepulse-ai-api-collection",
+    "name": "TruePulse AI API",
+    "description": "Complete API collection for TruePulse AI Retro Dashboard",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "item": [
+      {
+        "name": "Authentication",
+        "item": [
+          {
+            "name": "Sign Up",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"userName\": \"john_doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"SecurePassword123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"mobileNumber\": \"+1-555-0100\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"userType\": \"LEADER\",\n  \"isVerified\": false\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/auth/signup",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "auth", "signup"]
+              }
+            }
+          },
+          {
+            "name": "Login",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"userName\": \"john_doe\",\n  \"password\": \"SecurePassword123!\"\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/auth/login",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "auth", "login"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "User",
+        "item": [
+          {
+            "name": "Get Current User (Me)",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/user/me",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "user", "me"]
+              }
+            }
+          },
+          {
+            "name": "Get User by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/users/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "users", "1"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Retro",
+        "item": [
+          {
+            "name": "Create Retro",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"title\": \"Sprint 23 Retrospective\",\n  \"description\": \"Discussion on improvements for next sprint\",\n  \"userId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros"]
+              }
+            }
+          },
+          {
+            "name": "Get All Retros",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros"]
+              }
+            }
+          },
+          {
+            "name": "Get Retro by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Retro",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"title\": \"Sprint 23 Retrospective - Updated\",\n  \"description\": \"Updated discussion on improvements\",\n  \"userId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros", "1"]
+              }
+            }
+          },
+          {
+            "name": "Delete Retro",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros", "1"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Feedback Point",
+        "item": [
+          {
+            "name": "Create Feedback Point",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"type\": \"LIKED\",\n  \"description\": \"Great team collaboration and communication\",\n  \"retroId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/feedback-points",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "feedback-points"]
+              }
+            }
+          },
+          {
+            "name": "Get All Feedback Points",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/feedback-points",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "feedback-points"]
+              }
+            }
+          },
+          {
+            "name": "Get Feedback Point by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/feedback-points/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "feedback-points", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Feedback Point",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"type\": \"LIKED\",\n  \"description\": \"Excellent team collaboration throughout the sprint\",\n  \"retroId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/feedback-points/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "feedback-points", "1"]
+              }
+            }
+          },
+          {
+            "name": "Delete Feedback Point",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/feedback-points/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "feedback-points", "1"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Discussion",
+        "item": [
+          {
+            "name": "Create Discussion",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"note\": \"This was a major factor in our success this sprint\",\n  \"feedbackPointId\": 1,\n  \"userId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/discussions",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "discussions"]
+              }
+            }
+          },
+          {
+            "name": "Get All Discussions",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/discussions",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "discussions"]
+              }
+            }
+          },
+          {
+            "name": "Get Discussion by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/discussions/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "discussions", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Discussion",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"note\": \"This was definitely a major factor in our success this sprint\",\n  \"feedbackPointId\": 1,\n  \"userId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/discussions/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "discussions", "1"]
+              }
+            }
+          },
+          {
+            "name": "Delete Discussion",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/discussions/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "discussions", "1"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Question",
+        "item": [
+          {
+            "name": "Create Question",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"title\": \"How can we improve testing coverage?\",\n  \"description\": \"What strategies should we adopt to increase our test coverage in the next sprint?\",\n  \"userId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions"]
+              }
+            }
+          },
+          {
+            "name": "Get All Questions",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions"]
+              }
+            }
+          },
+          {
+            "name": "Get Question by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Question",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"title\": \"How can we improve testing coverage in the next sprint?\",\n  \"description\": \"What strategies and tools should we adopt to increase our test coverage?\",\n  \"userId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions", "1"]
+              }
+            }
+          },
+          {
+            "name": "Delete Question",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions", "1"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Action Item",
+        "item": [
+          {
+            "name": "Create Action Item",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"description\": \"Implement automated testing framework\",\n  \"dueDate\": \"2026-02-15\",\n  \"retroId\": 1,\n  \"assignedUserId\": 2\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items"]
+              }
+            }
+          },
+          {
+            "name": "Get All Action Items",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items"]
+              }
+            }
+          },
+          {
+            "name": "Get Action Item by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Action Item - Mark In Progress",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"description\": \"Implement automated testing framework\",\n  \"dueDate\": \"2026-02-15\",\n  \"status\": \"IN_PROGRESS\",\n  \"completed\": false,\n  \"retroId\": 1,\n  \"assignedUserId\": 2\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Action Item - Mark Completed",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"description\": \"Implement automated testing framework\",\n  \"dueDate\": \"2026-02-15\",\n  \"status\": \"COMPLETED\",\n  \"completed\": true,\n  \"completedAt\": \"2026-02-10T16:30:00\",\n  \"retroId\": 1,\n  \"assignedUserId\": 2\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items", "1"]
+              }
+            }
+          },
+          {
+            "name": "Delete Action Item",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items", "1"]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "variable": [
+      {
+        "key": "BASE_URL",
+        "value": "http://localhost:8080"
+      },
+      {
+        "key": "JWT_TOKEN",
+        "value": ""
+      }
+    ]
+  }
+}
+

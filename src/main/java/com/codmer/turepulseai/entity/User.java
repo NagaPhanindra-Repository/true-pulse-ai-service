@@ -16,8 +16,8 @@ import com.codmer.turepulseai.util.Gender;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(exclude = {"retros", "questions", "discussions", "assignedActionItems", "roles"})
-@ToString(exclude = {"retros", "questions", "discussions", "assignedActionItems", "roles"})
+@EqualsAndHashCode(exclude = {"retros", "questions", "answers", "discussions", "assignedActionItems", "roles"})
+@ToString(exclude = {"retros", "questions", "answers", "discussions", "assignedActionItems", "roles"})
 @Entity
 @Table(name = "users", indexes = {@Index(name = "idx_email", columnList = "email"), @Index(name = "idx_userName", columnList = "userName")})
 public class User {
@@ -62,6 +62,9 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Question> questions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Answer> answers = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Discussion> discussions = new ArrayList<>();

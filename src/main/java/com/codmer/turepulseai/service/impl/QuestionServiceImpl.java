@@ -8,6 +8,7 @@ import com.codmer.turepulseai.repository.UserRepository;
 import com.codmer.turepulseai.service.QuestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,7 +26,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public QuestionDto create(QuestionDto dto) {
-        User user = fetchUser(dto.getUserId());
+        User user = fetchUser();
         Question q = new Question();
         q.setTitle(dto.getTitle());
         q.setDescription(dto.getDescription());
@@ -61,7 +62,7 @@ public class QuestionServiceImpl implements QuestionService {
         if (dto.getDescription() != null) q.setDescription(dto.getDescription());
 
         if (dto.getUserId() != null && (q.getUser() == null || !dto.getUserId().equals(q.getUser().getId()))) {
-            User user = fetchUser(dto.getUserId());
+            User user = fetchUser();
             q.setUser(user);
         }
 
@@ -77,11 +78,28 @@ public class QuestionServiceImpl implements QuestionService {
         questionRepository.deleteById(id);
     }
 
-    private User fetchUser(Long userId) {
-        if (userId == null) {
+    @Override
+    @Transactional(readOnly = true)
+    public List<QuestionDto> getQuestionsByUserId() {
+        User user = fetchUser();
+        return questionRepository.findByUserId(user.getId()).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    private User fetchUser() {
+        // Get the username from the security context
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        // Find the user by username
+        User user = userRepository.findByUserName(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+
+        if (user.getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userId is required");
         }
-        return userRepository.findById(userId)
+        return userRepository.findById(user.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found"));
     }
 

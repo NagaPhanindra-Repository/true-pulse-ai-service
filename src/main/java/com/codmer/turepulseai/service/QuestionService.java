@@ -10,5 +10,6 @@ public interface QuestionService {
     List<QuestionDto> getAll();
     QuestionDto update(Long id, QuestionDto dto);
     void delete(Long id);
+    List<QuestionDto> getQuestionsByUserId();
 }
 

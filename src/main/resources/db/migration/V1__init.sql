@@ -93,6 +93,18 @@ CREATE TABLE IF NOT EXISTS questions (
 );
 CREATE INDEX IF NOT EXISTS idx_question_user_id ON questions(user_id);
 
+-- Answers (question REQUIRED, user REQUIRED)
+CREATE TABLE IF NOT EXISTS answers (
+  id BIGSERIAL PRIMARY KEY,
+  content TEXT NOT NULL,
+  question_id BIGINT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX IF NOT EXISTS idx_answer_question_id ON answers(question_id);
+CREATE INDEX IF NOT EXISTS idx_answer_user_id ON answers(user_id);
+
 -- Add additional indexes for roles and users names
 CREATE INDEX IF NOT EXISTS idx_role_name ON roles(name);
 CREATE INDEX IF NOT EXISTS idx_user_username ON users(user_name);
