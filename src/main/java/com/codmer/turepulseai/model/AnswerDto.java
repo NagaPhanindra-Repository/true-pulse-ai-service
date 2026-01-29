@@ -16,5 +16,6 @@ public class AnswerDto {
     private Long userId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String username;
 }
 

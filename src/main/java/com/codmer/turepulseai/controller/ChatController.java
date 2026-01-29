@@ -1,23 +1,19 @@
 package com.codmer.turepulseai.controller;
 
-import com.codmer.turepulseai.entity.Answer;
-import com.codmer.turepulseai.entity.Question;
 import com.codmer.turepulseai.model.ChatRequest;
 import com.codmer.turepulseai.model.ChatResponse;
 import com.codmer.turepulseai.model.QuestionChatRequest;
 import com.codmer.turepulseai.model.QuestionChatResponse;
-import com.codmer.turepulseai.repository.AnswerRepository;
-import com.codmer.turepulseai.repository.QuestionRepository;
+import com.codmer.turepulseai.model.SpecificFeedbackRequest;
+import com.codmer.turepulseai.model.SpecificFeedbackResponse;
+import com.codmer.turepulseai.model.UserQuestionsAnalysisResponse;
 import com.codmer.turepulseai.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -25,8 +21,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1")
 public class ChatController {
     private final ChatService chatService;
-    private final QuestionRepository questionRepository;
-    private final AnswerRepository answerRepository;
 
     @GetMapping("/chat/{question}")
     public String getChatResponse(@PathVariable String question){
@@ -59,43 +53,68 @@ public class ChatController {
 
         log.info("Received request to analyze question ID: {}", questionChatRequest.getQuestionId());
 
-        // Validate question ID
-        if (questionChatRequest.getQuestionId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Question ID is required");
-        }
-
-        // Fetch the question from database
-        Question question = questionRepository.findById(questionChatRequest.getQuestionId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Question not found"));
-
-        // Fetch all answers for this question, ordered by creation date (most recent first)
-        List<Answer> answers = answerRepository.findByQuestionIdOrderByCreatedAtDesc(question.getId());
-
-        log.info("Found {} answers for question ID: {}", answers.size(), question.getId());
-
-        // If no answers, still provide response but with appropriate message
-        if (answers.isEmpty()) {
-            log.warn("No answers found for question ID: {}", question.getId());
-            QuestionChatResponse emptyResponse = new QuestionChatResponse();
-            emptyResponse.setQuestionId(question.getId());
-            emptyResponse.setQuestionDetails(question.getTitle() + " - " + question.getDescription());
-            emptyResponse.setAnalysis("No answers received yet. Check back soon for feedback from followers.");
-            return ResponseEntity.ok(emptyResponse);
-        }
-
-        // Extract answer contents for AI analysis
-        List<String> answerContents = answers.stream()
-                .map(Answer::getContent)
-                .collect(Collectors.toList());
-
-        // Call ChatService to perform AI analysis
-        QuestionChatResponse analysisResponse = chatService.analyzeQuestionAnswers(
-                question.getId(),                question.getTitle(),
-                question.getDescription(),
-                answerContents,
-                questionChatRequest.getMessage()
-        );
+        // Delegate to service layer which handles all repository logic
+        QuestionChatResponse analysisResponse = chatService.analyzeQuestionAnswersFromRequest(questionChatRequest);
 
         return ResponseEntity.ok(analysisResponse);
     }
+
+    /**
+     * Analyzes a specific feedback/comment in context of all answers to determine alignment
+     * with majority sentiment, identifies if it's a commonly disliked aspect, or unique perspective
+     *
+     * Use Case: Understand how a specific follower's comment compares to overall sentiment.
+     * Useful for identifying common complaints, unique insights, minority views, or strengths.
+     *
+     * Examples:
+     * - A customer says "pricing is too high" - is this a common complaint?
+     * - A fan says "new outfit is bold" - is this majority opinion or unique?
+     * - A team member says "communication needs improvement" - is this widespread concern?
+     *
+     * @param specificFeedbackRequest - Contains question ID and specific feedback to analyze
+     * @return SpecificFeedbackResponse with 3-line contextual analysis
+     */
+    @PostMapping("/chat/specific-feedback/analyze")
+    public ResponseEntity<SpecificFeedbackResponse> analyzeSpecificFeedback(
+            @RequestBody SpecificFeedbackRequest specificFeedbackRequest) {
+
+        log.info("Received request to analyze specific feedback for question ID: {}",
+                specificFeedbackRequest.getQuestionId());
+
+        // Delegate to service layer which handles all repository logic
+        SpecificFeedbackResponse analysisResponse = chatService.analyzeSpecificFeedbackFromRequest(specificFeedbackRequest);
+
+        return ResponseEntity.ok(analysisResponse);
+    }
+
+    /**
+     * Analyzes all questions created by the logged-in user with comprehensive insights
+     * Provides detailed analysis for each question including:
+     * - Executive summary
+     * - General sentiment with satisfaction percentage
+     * - Most liked aspects (strengths)
+     * - Most disliked aspects (concerns)
+     * - Future expectations from followers
+     * - Actionable recommendations
+     *
+     * This endpoint is ideal for:
+     * - Business owners reviewing all customer feedback questions
+     * - Celebrities analyzing all fan engagement questions
+     * - Politicians reviewing citizen feedback across multiple topics
+     * - Team leaders analyzing all team feedback questions
+     * - Restaurant managers reviewing all menu feedback questions
+     *
+     * @return List of UserQuestionsAnalysisResponse with comprehensive analysis per question
+     */
+    @GetMapping("/chat/my-questions/analyze")
+    public ResponseEntity<List<UserQuestionsAnalysisResponse>> analyzeMyQuestions() {
+
+        log.info("Received request to analyze all questions for logged-in user");
+
+        // Delegate to service layer which handles all repository logic and user authentication
+        List<UserQuestionsAnalysisResponse> analysisResults = chatService.analyzeMyQuestionsForLoggedInUser();
+
+        return ResponseEntity.ok(analysisResults);
+    }
+
 }

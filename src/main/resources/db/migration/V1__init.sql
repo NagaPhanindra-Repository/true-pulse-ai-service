@@ -1,4 +1,8 @@
 -- Flyway V1 migration: initial schema for TruePulseAI
+-- PostgreSQL timezone-aware timestamps: TIMESTAMP WITH TIME ZONE automatically stores timezone info
+-- Example: 2026-01-28T14:30:00.123456+00:00 or 2026-01-28T14:30:00.123456+05:30
+-- When inserting, use: CURRENT_TIMESTAMP or timezone('UTC'::text, now())
+-- DBA Note: All timestamps are automatically converted to UTC for consistency
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (
@@ -14,8 +18,8 @@ CREATE TABLE IF NOT EXISTS users (
   gender VARCHAR(50),
   date_of_birth DATE,
   is_verified BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Roles

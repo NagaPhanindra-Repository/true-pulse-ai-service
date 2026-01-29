@@ -35,7 +35,7 @@ public class AnswerServiceImpl implements AnswerService {
         Question question = questionRepository.findById(dto.getQuestionId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Question not found"));
 
-        User user = userRepository.findById(dto.getUserId())
+        User user = userRepository.findByUserName(dto.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found"));
 
         Answer answer = new Answer();
@@ -127,7 +127,8 @@ public class AnswerServiceImpl implements AnswerService {
                 questionId,
                 userId,
                 answer.getCreatedAt(),
-                answer.getUpdatedAt()
+                answer.getUpdatedAt(),
+                answer.getUser() != null ? answer.getUser().getUserName() : null
         );
     }
 }
