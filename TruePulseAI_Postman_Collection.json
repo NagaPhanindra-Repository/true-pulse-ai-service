@@ -73,7 +73,7 @@
             }
           },
           {
-            "name": "Get User by ID",
+            "name": "Get Random Users (Not Following)",
             "request": {
               "method": "GET",
               "header": [
@@ -83,9 +83,124 @@
                 }
               ],
               "url": {
-                "raw": "{{BASE_URL}}/api/users/1",
+                "raw": "{{BASE_URL}}/api/user/random",
                 "host": ["{{BASE_URL}}"],
-                "path": ["api", "users", "1"]
+                "path": ["api", "user", "random"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "User Followers",
+        "item": [
+          {
+            "name": "Follow User",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"userUsernameToFollow\": \"jane_doe\"\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/followers/follow",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "followers", "follow"]
+              }
+            }
+          },
+          {
+            "name": "Unfollow User",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/followers/unfollow/jane_doe",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "followers", "unfollow", "jane_doe"]
+              }
+            }
+          },
+          {
+            "name": "Get My Followers",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/followers/my-followers",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "followers", "my-followers"]
+              }
+            }
+          },
+          {
+            "name": "Get My Following",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/followers/my-following",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "followers", "my-following"]
+              }
+            }
+          },
+          {
+            "name": "Get Users I Am Following",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/followers/my-following-users",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "followers", "my-following-users"]
+              }
+            }
+          },
+          {
+            "name": "Get Followers by Username",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/followers/user/john_doe",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "followers", "user", "john_doe"]
               }
             }
           }
@@ -137,6 +252,23 @@
             }
           },
           {
+            "name": "Get My Retros",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros/my-retros",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros", "my-retros"]
+              }
+            }
+          },
+          {
             "name": "Get Retro by ID",
             "request": {
               "method": "GET",
@@ -150,6 +282,23 @@
                 "raw": "{{BASE_URL}}/api/retros/1",
                 "host": ["{{BASE_URL}}"],
                 "path": ["api", "retros", "1"]
+              }
+            }
+          },
+          {
+            "name": "Get Retro Details",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros/1/details",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros", "1", "details"]
               }
             }
           },
@@ -455,6 +604,40 @@
             }
           },
           {
+            "name": "Get My Questions",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions/my-questions",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions", "my-questions"]
+              }
+            }
+          },
+          {
+            "name": "Get Questions from Followed Users",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/questions/feed/followed-users",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "questions", "feed", "followed-users"]
+              }
+            }
+          },
+          {
             "name": "Get Question by ID",
             "request": {
               "method": "GET",
@@ -516,6 +699,146 @@
         ]
       },
       {
+        "name": "Answer",
+        "item": [
+          {
+            "name": "Create Answer",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"content\": \"We should implement unit tests and integration tests for critical modules\",\n  \"questionId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers"]
+              }
+            }
+          },
+          {
+            "name": "Get All Answers",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers"]
+              }
+            }
+          },
+          {
+            "name": "Get Answer by ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers", "1"]
+              }
+            }
+          },
+          {
+            "name": "Get Answers by Question ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers/question/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers", "question", "1"]
+              }
+            }
+          },
+          {
+            "name": "Get Answers by User ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers/user/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers", "user", "1"]
+              }
+            }
+          },
+          {
+            "name": "Update Answer",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"content\": \"We should implement comprehensive unit tests and integration tests for all critical modules\",\n  \"questionId\": 1\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers", "1"]
+              }
+            }
+          },
+          {
+            "name": "Delete Answer",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/answers/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "answers", "1"]
+              }
+            }
+          }
+        ]
+      },
+      {
         "name": "Action Item",
         "item": [
           {
@@ -557,6 +880,23 @@
                 "raw": "{{BASE_URL}}/api/action-items",
                 "host": ["{{BASE_URL}}"],
                 "path": ["api", "action-items"]
+              }
+            }
+          },
+          {
+            "name": "Get Action Items by Retro ID",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/action-items/retro/1",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "action-items", "retro", "1"]
               }
             }
           },
@@ -642,6 +982,123 @@
                 "host": ["{{BASE_URL}}"],
                 "path": ["api", "action-items", "1"]
               }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Chat & AI Analysis",
+        "item": [
+          {
+            "name": "Simple Chat (GET)",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/v1/chat/What is Spring AI?",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "v1", "chat", "What is Spring AI?"]
+              }
+            }
+          },
+          {
+            "name": "Chat with Request Body",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"question\": \"What are the benefits of using Spring Boot?\"\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/v1/chat",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "v1", "chat"]
+              }
+            }
+          },
+          {
+            "name": "Analyze Question Answers",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"questionId\": 1,\n  \"message\": \"Analyze what customers think about our new product\"\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/v1/chat/question/analyze",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "v1", "chat", "question", "analyze"]
+              },
+              "description": "Analyzes a question and all its answers using Spring AI. Generates intelligent insights about what followers think, expect, and criticize. Returns a 3-line summary."
+            }
+          },
+          {
+            "name": "Analyze Specific Feedback",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"questionId\": 1,\n  \"specificQuestion\": \"Is the pricing too high compared to competitors?\"\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/v1/chat/specific-feedback/analyze",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "v1", "chat", "specific-feedback", "analyze"]
+              },
+              "description": "Analyzes a specific feedback/comment in context of all answers to determine alignment with majority sentiment. Useful for identifying common complaints or unique insights."
+            }
+          },
+          {
+            "name": "Analyze My Questions (All)",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/v1/chat/my-questions/analyze",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "v1", "chat", "my-questions", "analyze"]
+              },
+              "description": "Analyzes all questions created by the logged-in user with comprehensive insights including executive summary, sentiment analysis, liked/disliked aspects, future expectations, and recommendations."
             }
           }
         ]
