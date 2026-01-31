@@ -2,6 +2,7 @@ package com.codmer.turepulseai.controller;
 
 import com.codmer.turepulseai.model.RetroDto;
 import com.codmer.turepulseai.model.RetroDetailDto;
+import com.codmer.turepulseai.model.RetroAnalysisResponse;
 import com.codmer.turepulseai.service.RetroService;
 import com.codmer.turepulseai.repository.UserRepository;
 import com.codmer.turepulseai.entity.User;
@@ -82,7 +83,15 @@ public class RetroController {
         retroService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Analyze a retro with AI based on feedback points, discussions, action items, and past retros
+     *
+     * @param id - Retro ID
+     * @return RetroAnalysisResponse with concise summary
+     */
+    @GetMapping("/{id}/analysis")
+    public ResponseEntity<RetroAnalysisResponse> analyzeRetro(@PathVariable Long id) {
+        return ResponseEntity.ok(retroService.analyzeRetro(id));
+    }
 }
-
-
-

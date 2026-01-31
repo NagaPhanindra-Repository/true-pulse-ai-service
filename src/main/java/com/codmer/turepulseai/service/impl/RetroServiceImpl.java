@@ -2,6 +2,7 @@ package com.codmer.turepulseai.service.impl;
 
 import com.codmer.turepulseai.model.RetroDto;
 import com.codmer.turepulseai.model.RetroDetailDto;
+import com.codmer.turepulseai.model.RetroAnalysisResponse;
 import com.codmer.turepulseai.entity.Retro;
 import com.codmer.turepulseai.entity.User;
 import com.codmer.turepulseai.entity.FeedbackPoint;
@@ -27,6 +28,7 @@ public class RetroServiceImpl implements RetroService {
 
     private final RetroRepository retroRepository;
     private final UserRepository userRepository;
+    private final org.springframework.ai.chat.client.ChatClient chatClient;
 
 
     @Override
@@ -207,5 +209,148 @@ public class RetroServiceImpl implements RetroService {
         Long userId = r.getUser() != null ? r.getUser().getId() : null;
         return new RetroDto(r.getUpdatedAt(), r.getCreatedAt(), userId, r.getDescription(), r.getTitle(), r.getId());
     }
-}
 
+    @Override
+    @Transactional(readOnly = true)
+    public RetroAnalysisResponse analyzeRetro(Long retroId) {
+        Retro retro = retroRepository.findById(retroId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Retro not found"));
+
+        String currentRetroContext = buildCurrentRetroContext(retro);
+        String currentRetroSummary = summarizeCurrentRetro(retro, currentRetroContext);
+
+        List<Retro> pastRetros = retroRepository.findByUserIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                retro.getUser().getId(), retro.getCreatedAt());
+        String pastRetrosSummary = summarizePastRetros(retro.getUser().getUserName(), pastRetros);
+
+        String finalSummary = mergeSummaries(currentRetroSummary, pastRetrosSummary);
+        return new RetroAnalysisResponse(retro.getId(), finalSummary);
+    }
+
+    private String buildCurrentRetroContext(Retro retro) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Retro Title: ").append(retro.getTitle()).append("\n");
+        sb.append("Retro Description: ").append(retro.getDescription()).append("\n\n");
+
+        List<FeedbackPoint> feedbackPoints = retro.getFeedbackPoints();
+        if (feedbackPoints != null && !feedbackPoints.isEmpty()) {
+            sb.append("Feedback Points by Section:\n");
+            for (FeedbackPoint fp : feedbackPoints) {
+                sb.append("- ").append(fp.getType()).append(": ").append(fp.getDescription()).append("\n");
+                if (fp.getDiscussions() != null && !fp.getDiscussions().isEmpty()) {
+                    sb.append("  Discussions:\n");
+                    for (Discussion discussion : fp.getDiscussions()) {
+                        sb.append("  * ").append(discussion.getNote()).append("\n");
+                    }
+                }
+            }
+        } else {
+            sb.append("Feedback Points: None\n");
+        }
+
+        List<ActionItem> actionItems = retro.getActionItems();
+        if (actionItems != null && !actionItems.isEmpty()) {
+            long completedCount = actionItems.stream().filter(ActionItem::isCompleted).count();
+            sb.append("\nAction Items (Completed ").append(completedCount).append("/").append(actionItems.size()).append("):\n");
+            for (ActionItem item : actionItems) {
+                sb.append("- ").append(item.getDescription())
+                        .append(" | Status: ").append(item.getStatus())
+                        .append(" | Completed: ").append(item.isCompleted())
+                        .append(" | Assigned: ").append(item.getAssignedUserName() != null ? item.getAssignedUserName() : "Unassigned")
+                        .append("\n");
+            }
+        } else {
+            sb.append("\nAction Items: None\n");
+        }
+
+        return sb.toString();
+    }
+
+    private String summarizeCurrentRetro(Retro retro, String context) {
+        String systemPrompt = """
+                You are a senior Scrum Master and retrospective facilitator.
+                Analyze the current sprint retro feedback and action items.
+                Produce a concise summary that covers:
+                - How the team did overall this sprint
+                - What went well (LIKED) and what was learned (LEARNED)
+                - Where the team lacked (LACKED) and what they longed for (LONGED_FOR)
+                - Appreciation received and completion of action items
+                - Where the team is lacking and what to improve next sprint
+                Mention standout team members if their names appear in action items or discussions.
+                Keep it brief and precise.
+                """;
+
+        List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
+        messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
+        messages.add(new org.springframework.ai.chat.messages.UserMessage(
+                "Current Retro ID: " + retro.getId() + "\n" + context +
+                        "\nSummarize the current sprint in 2-3 short paragraphs."));
+
+        var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
+        String content = response.content();
+        return content == null ? "No analysis available" : content.trim();
+    }
+
+    private String summarizePastRetros(String scrumMasterUserName, List<Retro> pastRetros) {
+        if (pastRetros == null || pastRetros.isEmpty()) {
+            return "No past retros available to identify historical patterns.";
+        }
+
+        StringBuilder history = new StringBuilder();
+        for (Retro retro : pastRetros) {
+            history.append("Retro: ").append(retro.getTitle()).append("\n");
+            if (retro.getFeedbackPoints() != null) {
+                for (FeedbackPoint fp : retro.getFeedbackPoints()) {
+                    history.append("- ").append(fp.getType()).append(": ").append(fp.getDescription()).append("\n");
+                }
+            }
+            if (retro.getActionItems() != null) {
+                long completedCount = retro.getActionItems().stream().filter(ActionItem::isCompleted).count();
+                history.append("Action Items Completed: ").append(completedCount)
+                        .append("/").append(retro.getActionItems().size()).append("\n");
+            }
+            history.append("\n");
+        }
+
+        String systemPrompt = """
+                You are a senior Scrum Master reviewing historical retrospectives.
+                Identify patterns, improvement trends, and recurring gaps across past sprints.
+                Comment on how the team is improving, how they are tackling action items,
+                and highlight any persistent issues that need focus.
+                Provide a concise history-based assessment.
+                """;
+
+        List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
+        messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
+        messages.add(new org.springframework.ai.chat.messages.UserMessage(
+                "Scrum Master: " + scrumMasterUserName + "\n" + history +
+                        "\nSummarize historical patterns in 4-6 sentences."));
+
+        var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
+        String content = response.content();
+        return content == null ? "No historical analysis available" : content.trim();
+    }
+
+    private String mergeSummaries(String currentSummary, String historicalSummary) {
+        String systemPrompt = """
+                You are a senior retrospective facilitator.
+                Combine the current sprint summary and historical patterns into a single final insight.
+                Produce 3-4 lines that cover:
+                - Overall sprint performance and key feedback (LIKED, LEARNED, LACKED, LONGED_FOR)
+                - Action item completion and appreciation
+                - Historical trend and improvement direction
+                - Key people doing well (if mentioned)
+                Avoid repetition and keep the response concise.
+                """;
+
+        List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
+        messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
+        messages.add(new org.springframework.ai.chat.messages.UserMessage(
+                "Current Summary:\n" + currentSummary + "\n\nHistorical Summary:\n" + historicalSummary +
+                        "\n\nGenerate final 3-4 line summary."));
+
+        var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
+        String content = response.content();
+        return content == null ? "No combined analysis available" : content.trim();
+    }
+}

@@ -1,5 +1,7 @@
 package com.codmer.turepulseai.controller;
 
+import com.codmer.turepulseai.model.FeedbackPointAnalysisRequest;
+import com.codmer.turepulseai.model.FeedbackPointAnalysisResponse;
 import com.codmer.turepulseai.model.FeedbackPointDto;
 import com.codmer.turepulseai.service.FeedbackPointService;
 import lombok.RequiredArgsConstructor;
@@ -42,5 +44,9 @@ public class FeedbackPointController {
         feedbackPointService.delete(id);
         return ResponseEntity.noContent().build();
     }
-}
 
+    @PostMapping("/analysis")
+    public ResponseEntity<FeedbackPointAnalysisResponse> analyze(@RequestBody FeedbackPointAnalysisRequest request) {
+        return ResponseEntity.ok(feedbackPointService.analyzeFeedbackPoint(request));
+    }
+}

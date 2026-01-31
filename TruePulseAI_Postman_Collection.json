@@ -303,6 +303,23 @@
             }
           },
           {
+            "name": "Analyze Retro (AI Summary)",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/retros/1/analysis",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "retros", "1", "analysis"]
+              }
+            }
+          },
+          {
             "name": "Update Retro",
             "request": {
               "method": "PUT",
@@ -447,6 +464,31 @@
                 "raw": "{{BASE_URL}}/api/feedback-points/1",
                 "host": ["{{BASE_URL}}"],
                 "path": ["api", "feedback-points", "1"]
+              }
+            }
+          },
+          {
+            "name": "Analyze Feedback Point (AI Summary)",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"retroId\": 1,\n  \"feedbackPointId\": 10\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/feedback-points/analysis",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "feedback-points", "analysis"]
               }
             }
           }
@@ -1116,4 +1158,3 @@
     ]
   }
 }
-

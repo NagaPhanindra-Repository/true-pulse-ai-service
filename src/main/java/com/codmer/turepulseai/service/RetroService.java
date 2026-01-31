@@ -2,6 +2,7 @@ package com.codmer.turepulseai.service;
 
 import com.codmer.turepulseai.model.RetroDto;
 import com.codmer.turepulseai.model.RetroDetailDto;
+import com.codmer.turepulseai.model.RetroAnalysisResponse;
 
 import java.util.List;
 
@@ -22,5 +23,9 @@ public interface RetroService {
      * Get all retros created by a specific user
      */
     List<RetroDto> getRetrosByUserId(Long userId);
-}
 
+    /**
+     * Analyze retro using AI to provide insights and suggestions
+     */
+    RetroAnalysisResponse analyzeRetro(Long retroId);
+}

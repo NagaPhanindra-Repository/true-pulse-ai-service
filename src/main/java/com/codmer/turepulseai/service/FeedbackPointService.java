@@ -1,6 +1,8 @@
 package com.codmer.turepulseai.service;
 
 import com.codmer.turepulseai.model.FeedbackPointDto;
+import com.codmer.turepulseai.model.FeedbackPointAnalysisRequest;
+import com.codmer.turepulseai.model.FeedbackPointAnalysisResponse;
 
 import java.util.List;
 
@@ -10,5 +12,5 @@ public interface FeedbackPointService {
     List<FeedbackPointDto> getAll();
     FeedbackPointDto update(Long id, FeedbackPointDto dto);
     void delete(Long id);
+    FeedbackPointAnalysisResponse analyzeFeedbackPoint(FeedbackPointAnalysisRequest request);
 }
-
