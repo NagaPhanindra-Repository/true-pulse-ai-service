@@ -250,22 +250,25 @@ public class ChatService {
             answersContext.append("Answer ").append(i + 1).append(": ").append(allAnswers.get(i)).append("\n\n");
         }
 
-        // System prompt for comprehensive question analysis
+        // System prompt for comprehensive question analysis with JSON output
         String systemPrompt = """
                 You are an expert AI analyst specializing in comprehensive feedback analysis and business intelligence.
                 
                 Your task: Analyze ALL answers/feedback to a question and provide DETAILED insights across multiple dimensions.
                 
-                Provide analysis in these specific categories:
-                1. EXECUTIVE SUMMARY (3 lines): High-level overview of key findings
-                2. GENERAL SENTIMENT: Overall sentiment with satisfaction %, excitement level, competitive position
-                3. MOST LIKED ASPECTS: What followers appreciate most - strengths and positive highlights
-                4. MOST DISLIKED ASPECTS: Common complaints, concerns, areas needing improvement
-                5. FUTURE EXPECTATIONS: What followers hope to see, expect in future iterations
-                6. RECOMMENDATIONS: Strategic actionable recommendations based on feedback
+                You MUST respond with a JSON object containing these exact keys:
+                {
+                  "executiveSummary": "3-line high-level overview of key findings",
+                  "generalSentiment": "Overall sentiment with satisfaction %, excitement level, competitive position",
+                  "mostLikedAspects": "What followers appreciate most - strengths and positive highlights",
+                  "mostDislikedAspects": "Common complaints, concerns, areas needing improvement",
+                  "futureExpectations": "What followers hope to see, expect in future iterations",
+                  "recommendations": "Strategic actionable recommendations based on feedback"
+                }
                 
                 Be specific, insightful, data-driven where possible (mention percentages/counts), and actionable.
                 Use clear, professional language suitable for executives and decision-makers.
+                Return ONLY valid JSON without any additional text or markdown formatting.
                 """;
 
         List<Message> messages = new ArrayList<>();
@@ -278,14 +281,7 @@ public class ChatService {
         userContent.append("Total Answers Received: ").append(allAnswers.size()).append("\n\n");
         userContent.append("=== ALL FEEDBACK/ANSWERS ===\n\n");
         userContent.append(answersContext);
-        userContent.append("\nProvide comprehensive analysis covering:\n");
-        userContent.append("1. Executive Summary (3 lines)\n");
-        userContent.append("2. General Sentiment (with satisfaction % if determinable)\n");
-        userContent.append("3. Most Liked Aspects\n");
-        userContent.append("4. Most Disliked Aspects\n");
-        userContent.append("5. Future Expectations\n");
-        userContent.append("6. Recommendations\n\n");
-        userContent.append("Format each section clearly with the section name followed by analysis.");
+        userContent.append("\nAnalyze the above feedback and return ONLY a valid JSON object with the six required fields: executiveSummary, generalSentiment, mostLikedAspects, mostDislikedAspects, futureExpectations, and recommendations.");
 
         messages.add(new UserMessage(userContent.toString()));
 
@@ -294,17 +290,153 @@ public class ChatService {
         var response = chatClient.prompt(prompt).call();
         String analysisContent = response.content();
 
-        log.info("Comprehensive analysis generated for question ID: {}", questionId);
+        log.info("Raw AI response for question ID {}: {}", questionId, analysisContent);
 
         // Parse the AI response into structured sections
-        UserQuestionsAnalysisResponse analysisResponse = parseComprehensiveAnalysis(
+        UserQuestionsAnalysisResponse analysisResponse = parseComprehensiveAnalysisFromJson(
                 analysisContent, questionId, questionTitle, questionDescription, allAnswers.size());
 
         return analysisResponse;
     }
 
     /**
-     * Parses AI-generated comprehensive analysis into structured response
+     * Parses AI-generated JSON response into structured UserQuestionsAnalysisResponse
+     * Handles both clean JSON and JSON wrapped in markdown code blocks
+     */
+    private UserQuestionsAnalysisResponse parseComprehensiveAnalysisFromJson(String analysisContent,
+                                                                              Long questionId,
+                                                                              String questionTitle,
+                                                                              String questionDescription,
+                                                                              int totalAnswers) {
+        UserQuestionsAnalysisResponse response = new UserQuestionsAnalysisResponse();
+        response.setQuestionId(questionId);
+        response.setQuestionTitle(questionTitle);
+        response.setQuestionDescription(questionDescription);
+        response.setTotalAnswers(totalAnswers);
+        response.setModel("Spring AI");
+        response.setCreatedAt(Instant.now().getEpochSecond());
+
+        try {
+            // Clean up the response - remove markdown code blocks if present
+            String cleanedJson = analysisContent.trim();
+
+            // Remove markdown JSON code block markers
+            if (cleanedJson.startsWith("```json")) {
+                cleanedJson = cleanedJson.substring(7);
+            } else if (cleanedJson.startsWith("```")) {
+                cleanedJson = cleanedJson.substring(3);
+            }
+
+            if (cleanedJson.endsWith("```")) {
+                cleanedJson = cleanedJson.substring(0, cleanedJson.length() - 3);
+            }
+
+            cleanedJson = cleanedJson.trim();
+
+            // Parse JSON manually (simple parsing for known structure)
+            response.setExecutiveSummary(extractJsonField(cleanedJson, "executiveSummary"));
+            response.setGeneralSentiment(extractJsonField(cleanedJson, "generalSentiment"));
+            response.setMostLikedAspects(extractJsonField(cleanedJson, "mostLikedAspects"));
+            response.setMostDislikedAspects(extractJsonField(cleanedJson, "mostDislikedAspects"));
+            response.setFutureExpectations(extractJsonField(cleanedJson, "futureExpectations"));
+            response.setRecommendations(extractJsonField(cleanedJson, "recommendations"));
+
+            log.info("Successfully parsed JSON response for question ID: {}", questionId);
+
+        } catch (Exception e) {
+            log.error("Failed to parse JSON response for question ID: {}, falling back to text extraction", questionId, e);
+
+            // Fallback: try to use the old text-based extraction
+            response.setExecutiveSummary(extractSection(analysisContent, "Executive Summary", "General Sentiment"));
+            response.setGeneralSentiment(extractSection(analysisContent, "General Sentiment", "Most Liked Aspects"));
+            response.setMostLikedAspects(extractSection(analysisContent, "Most Liked Aspects", "Most Disliked Aspects"));
+            response.setMostDislikedAspects(extractSection(analysisContent, "Most Disliked Aspects", "Future Expectations"));
+            response.setFutureExpectations(extractSection(analysisContent, "Future Expectations", "Recommendations"));
+            response.setRecommendations(extractSection(analysisContent, "Recommendations", null));
+
+            // If still null, use the raw content
+            if (response.getExecutiveSummary() == null) {
+                response.setExecutiveSummary(analysisContent.substring(0, Math.min(500, analysisContent.length())));
+            }
+            if (response.getGeneralSentiment() == null) {
+                response.setGeneralSentiment("Analysis based on " + totalAnswers + " responses.");
+            }
+            if (response.getMostLikedAspects() == null) {
+                response.setMostLikedAspects("Please see full analysis.");
+            }
+            if (response.getMostDislikedAspects() == null) {
+                response.setMostDislikedAspects("Please see full analysis.");
+            }
+            if (response.getFutureExpectations() == null) {
+                response.setFutureExpectations("Please see full analysis.");
+            }
+            if (response.getRecommendations() == null) {
+                response.setRecommendations("Please see full analysis.");
+            }
+        }
+
+        return response;
+    }
+
+    /**
+     * Extracts a field value from a JSON string
+     * Simple JSON field extraction for known structure
+     */
+    private String extractJsonField(String json, String fieldName) {
+        try {
+            // Find the field
+            String searchPattern = "\"" + fieldName + "\"";
+            int fieldIndex = json.indexOf(searchPattern);
+
+            if (fieldIndex == -1) {
+                log.warn("Field '{}' not found in JSON", fieldName);
+                return null;
+            }
+
+            // Find the colon after the field name
+            int colonIndex = json.indexOf(":", fieldIndex);
+            if (colonIndex == -1) {
+                return null;
+            }
+
+            // Skip whitespace and find opening quote
+            int startQuoteIndex = json.indexOf("\"", colonIndex);
+            if (startQuoteIndex == -1) {
+                return null;
+            }
+
+            // Find closing quote (handling escaped quotes)
+            int endQuoteIndex = startQuoteIndex + 1;
+            while (endQuoteIndex < json.length()) {
+                if (json.charAt(endQuoteIndex) == '"' && json.charAt(endQuoteIndex - 1) != '\\') {
+                    break;
+                }
+                endQuoteIndex++;
+            }
+
+            if (endQuoteIndex >= json.length()) {
+                return null;
+            }
+
+            // Extract and clean the value
+            String value = json.substring(startQuoteIndex + 1, endQuoteIndex);
+
+            // Unescape common JSON escapes
+            value = value.replace("\\n", "\n")
+                         .replace("\\\"", "\"")
+                         .replace("\\\\", "\\")
+                         .replace("\\t", "\t");
+
+            return value.trim();
+
+        } catch (Exception e) {
+            log.error("Error extracting field '{}' from JSON", fieldName, e);
+            return null;
+        }
+    }
+
+    /**
+     * Parses AI-generated comprehensive analysis into structured response (legacy text-based method)
      * Extracts different sections and formats them appropriately
      */
     private UserQuestionsAnalysisResponse parseComprehensiveAnalysis(String analysisContent,
