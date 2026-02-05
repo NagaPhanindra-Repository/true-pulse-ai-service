@@ -207,6 +207,226 @@
         ]
       },
       {
+        "name": "Entities",
+        "item": [
+          {
+            "name": "Get Random Entities (Default 10)",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities/random",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities", "random"]
+              },
+              "description": "Retrieves 10 random entities from the database (default limit)."
+            },
+            "response": [
+              {
+                "name": "Success Response",
+                "originalRequest": {
+                  "method": "GET",
+                  "header": [
+                    {
+                      "key": "Authorization",
+                      "value": "Bearer {{JWT_TOKEN}}"
+                    }
+                  ],
+                  "url": {
+                    "raw": "{{BASE_URL}}/api/entities/random",
+                    "host": ["{{BASE_URL}}"],
+                    "path": ["api", "entities", "random"]
+                  }
+                },
+                "status": "OK",
+                "code": 200,
+                "_postman_previewlanguage": "json",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": "[\n  {\n    \"id\": 1,\n    \"type\": \"BUSINESS\",\n    \"displayName\": \"TruePulse Cafe\",\n    \"createdByUserId\": 5,\n    \"createdAt\": \"2026-02-04T10:30:00\",\n    \"updatedAt\": \"2026-02-04T10:30:00\",\n    \"businessProfile\": {\n      \"entityId\": 1,\n      \"fullName\": \"TruePulse Cafe\",\n      \"address\": \"123 Main St, Downtown\",\n      \"description\": \"Local cafe serving premium coffee and pastries\",\n      \"businessType\": \"Restaurant\",\n      \"mobileNumber\": \"5550100\",\n      \"countryCode\": \"+1\",\n      \"email\": \"contact@truepulsecafe.com\",\n      \"contactHours\": \"Mon-Fri 9am-6pm, Sat 10am-4pm\"\n    },\n    \"businessLeaderProfile\": null,\n    \"politicianProfile\": null,\n    \"celebrityProfile\": null\n  },\n  {\n    \"id\": 2,\n    \"type\": \"CELEBRITY\",\n    \"displayName\": \"T-Ace Music\",\n    \"createdByUserId\": 8,\n    \"createdAt\": \"2026-02-04T13:45:00\",\n    \"updatedAt\": \"2026-02-04T13:45:00\",\n    \"businessProfile\": null,\n    \"businessLeaderProfile\": null,\n    \"politicianProfile\": null,\n    \"celebrityProfile\": {\n      \"entityId\": 2,\n      \"realName\": \"Taylor Mitchell\",\n      \"artistName\": \"T-Ace\",\n      \"artistType\": \"Singer-Songwriter\",\n      \"description\": \"Chart-topping artist known for soul and R&B music\",\n      \"mobileNumber\": \"5550400\",\n      \"countryCode\": \"+1\",\n      \"email\": \"info@tacemusic.com\",\n      \"contactHours\": \"Mon-Fri 10am-7pm for business inquiries\"\n    }\n  }\n]"
+              }
+            ]
+          },
+          {
+            "name": "Get Random Entities (Custom Limit)",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities/random?limit=20",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities", "random"],
+                "query": [
+                  {
+                    "key": "limit",
+                    "value": "20",
+                    "description": "Number of random entities to return (max: 50)"
+                  }
+                ]
+              },
+              "description": "Retrieves 20 random entities. You can set limit between 1-50."
+            }
+          },
+          {
+            "name": "Search Entities by Name",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities/search?q=cafe",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities", "search"],
+                "query": [
+                  {
+                    "key": "q",
+                    "value": "cafe",
+                    "description": "Search term (case-insensitive, partial match)"
+                  }
+                ]
+              },
+              "description": "Searches entities by display name and profile names (fullName, artistName, etc). Case-insensitive partial matching."
+            },
+            "response": [
+              {
+                "name": "Success Response",
+                "originalRequest": {
+                  "method": "GET",
+                  "header": [
+                    {
+                      "key": "Authorization",
+                      "value": "Bearer {{JWT_TOKEN}}"
+                    }
+                  ],
+                  "url": {
+                    "raw": "{{BASE_URL}}/api/entities/search?q=cafe",
+                    "host": ["{{BASE_URL}}"],
+                    "path": ["api", "entities", "search"],
+                    "query": [
+                      {
+                        "key": "q",
+                        "value": "cafe"
+                      }
+                    ]
+                  }
+                },
+                "status": "OK",
+                "code": 200,
+                "_postman_previewlanguage": "json",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": "[\n  {\n    \"id\": 1,\n    \"type\": \"BUSINESS\",\n    \"displayName\": \"TruePulse Cafe\",\n    \"createdByUserId\": 5,\n    \"createdAt\": \"2026-02-04T10:30:00\",\n    \"updatedAt\": \"2026-02-04T10:30:00\",\n    \"businessProfile\": {\n      \"entityId\": 1,\n      \"fullName\": \"TruePulse Cafe\",\n      \"address\": \"123 Main St, Downtown\",\n      \"description\": \"Local cafe serving premium coffee and pastries\",\n      \"businessType\": \"Restaurant\",\n      \"mobileNumber\": \"5550100\",\n      \"countryCode\": \"+1\",\n      \"email\": \"contact@truepulsecafe.com\",\n      \"contactHours\": \"Mon-Fri 9am-6pm, Sat 10am-4pm\"\n    },\n    \"businessLeaderProfile\": null,\n    \"politicianProfile\": null,\n    \"celebrityProfile\": null\n  },\n  {\n    \"id\": 5,\n    \"type\": \"BUSINESS\",\n    \"displayName\": \"Downtown Cafe\",\n    \"createdByUserId\": 12,\n    \"createdAt\": \"2026-02-03T15:20:00\",\n    \"updatedAt\": \"2026-02-03T15:20:00\",\n    \"businessProfile\": {\n      \"entityId\": 5,\n      \"fullName\": \"Downtown Cafe & Bistro\",\n      \"address\": \"456 Park Ave\",\n      \"description\": \"Cozy cafe with outdoor seating\",\n      \"businessType\": \"Restaurant\",\n      \"mobileNumber\": \"5550150\",\n      \"countryCode\": \"+1\",\n      \"email\": \"hello@downtowncafe.com\",\n      \"contactHours\": \"Daily 8am-8pm\"\n    },\n    \"businessLeaderProfile\": null,\n    \"politicianProfile\": null,\n    \"celebrityProfile\": null\n  }\n]"
+              },
+              {
+                "name": "Empty Results",
+                "originalRequest": {
+                  "method": "GET",
+                  "header": [
+                    {
+                      "key": "Authorization",
+                      "value": "Bearer {{JWT_TOKEN}}"
+                    }
+                  ],
+                  "url": {
+                    "raw": "{{BASE_URL}}/api/entities/search?q=nonexistent",
+                    "host": ["{{BASE_URL}}"],
+                    "path": ["api", "entities", "search"],
+                    "query": [
+                      {
+                        "key": "q",
+                        "value": "nonexistent"
+                      }
+                    ]
+                  }
+                },
+                "status": "OK",
+                "code": 200,
+                "_postman_previewlanguage": "json",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": "[]"
+              }
+            ]
+          },
+          {
+            "name": "Search Entities - Celebrity",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities/search?q=Taylor",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities", "search"],
+                "query": [
+                  {
+                    "key": "q",
+                    "value": "Taylor",
+                    "description": "Search for celebrities by real name or artist name"
+                  }
+                ]
+              },
+              "description": "Example of searching for celebrities by name."
+            }
+          },
+          {
+            "name": "Search Entities - Politician",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities/search?q=Smith",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities", "search"],
+                "query": [
+                  {
+                    "key": "q",
+                    "value": "Smith",
+                    "description": "Search for politicians by name"
+                  }
+                ]
+              },
+              "description": "Example of searching for politicians."
+            }
+          }
+        ]
+      },
+      {
         "name": "Retro",
         "item": [
           {
@@ -1144,16 +1364,165 @@
             }
           }
         ]
-      }
-    ],
-    "variable": [
-      {
-        "key": "BASE_URL",
-        "value": "http://localhost:8080"
       },
       {
-        "key": "JWT_TOKEN",
-        "value": ""
+        "name": "Entity Profiles",
+        "item": [
+          {
+            "name": "Create Entity",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"type\": \"BUSINESS\",\n  \"displayName\": \"TruePulse Cafe\",\n  \"createdByUserId\": 1,\n  \"businessFullName\": \"TruePulse Cafe\",\n  \"businessAddress\": \"123 Main St\",\n  \"businessDescription\": \"Local cafe\",\n  \"businessType\": \"Restaurant\",\n  \"businessMobileNumber\": \"5550100\",\n  \"businessCountryCode\": \"+1\",\n  \"businessEmail\": \"contact@truepulsecafe.com\",\n  \"businessContactHours\": \"Mon-Fri 9am-6pm\"\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities"]
+              }
+            }
+          },
+          {
+            "name": "Get Entities",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities"]
+              }
+            }
+          },
+          {
+            "name": "Get My Entities",
+            "request": {
+              "method": "GET",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "url": {
+                "raw": "{{BASE_URL}}/api/entities/my-entities",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "entities", "my-entities"]
+              },
+              "description": "Get all entities created by the logged-in user with complete profile details. Uses authorization header to identify user and returns all entity types (BUSINESS, BUSINESS_LEADER, POLITICIAN, CELEBRITY) with full details."
+            },
+            "response": [
+              {
+                "name": "Success - Complete Entity Details",
+                "originalRequest": {
+                  "method": "GET",
+                  "header": [
+                    {
+                      "key": "Authorization",
+                      "value": "Bearer {{JWT_TOKEN}}"
+                    }
+                  ],
+                  "url": {
+                    "raw": "{{BASE_URL}}/api/entities/my-entities",
+                    "host": ["{{BASE_URL}}"],
+                    "path": ["api", "entities", "my-entities"]
+                  }
+                },
+                "status": "OK",
+                "code": 200,
+                "_postman_previewlanguage": "json",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "cookie": [],
+                "body": "[\n  {\n    \"id\": 1,\n    \"type\": \"BUSINESS\",\n    \"displayName\": \"TruePulse Cafe\",\n    \"createdByUserId\": 5,\n    \"createdAt\": \"2026-02-04T10:30:00\",\n    \"updatedAt\": \"2026-02-04T10:30:00\",\n    \"businessProfile\": {\n      \"entityId\": 1,\n      \"fullName\": \"TruePulse Cafe\",\n      \"address\": \"123 Main St, Downtown\",\n      \"description\": \"Local cafe serving premium coffee and pastries\",\n      \"businessType\": \"Restaurant\",\n      \"mobileNumber\": \"5550100\",\n      \"countryCode\": \"+1\",\n      \"email\": \"contact@truepulsecafe.com\",\n      \"contactHours\": \"Mon-Fri 9am-6pm, Sat 10am-4pm\"\n    },\n    \"businessLeaderProfile\": null,\n    \"politicianProfile\": null,\n    \"celebrityProfile\": null\n  },\n  {\n    \"id\": 2,\n    \"type\": \"BUSINESS_LEADER\",\n    \"displayName\": \"Alex Leadership\",\n    \"createdByUserId\": 5,\n    \"createdAt\": \"2026-02-04T11:15:00\",\n    \"updatedAt\": \"2026-02-04T11:15:00\",\n    \"businessProfile\": null,\n    \"businessLeaderProfile\": {\n      \"entityId\": 2,\n      \"fullName\": \"Alex Johnson\",\n      \"company\": \"TruePulse Inc\",\n      \"projectName\": \"PulseOne Q1 Initiative\",\n      \"projectDescription\": \"Launch of new product line focusing on customer engagement\",\n      \"mobileNumber\": \"5550200\",\n      \"countryCode\": \"+1\",\n      \"email\": \"alex@truepulse.com\",\n      \"contactHours\": \"Mon-Fri 9am-5pm\"\n    },\n    \"politicianProfile\": null,\n    \"celebrityProfile\": null\n  }\n]"
+              }
+            ]
+          },
+          {
+            "name": "Upload Business Document",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "formdata",
+                "formdata": [
+                  {
+                    "key": "file",
+                    "type": "file",
+                    "src": []
+                  },
+                  {
+                    "key": "entityId",
+                    "value": "1",
+                    "type": "text"
+                  },
+                  {
+                    "key": "displayName",
+                    "value": "TruePulse Cafe",
+                    "type": "text"
+                  }
+                ]
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/upload",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "upload"]
+              },
+              "description": "Upload a document mapped to an entity using entityId + displayName (multipart form data)."
+            }
+          },
+          {
+            "name": "Search Business Documents",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"entityId\": 1,\n  \"displayName\": \"TruePulse Cafe\",\n  \"query\": \"What are your business hours?\",\n  \"topK\": 5\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/search",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "search"]
+              },
+              "description": "Search document chunks mapped to the given entityId + displayName."
+            }
+          }
+        ]
       }
     ]
   }

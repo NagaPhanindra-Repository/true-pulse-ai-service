@@ -6,6 +6,9 @@ spring:
       chat:
         options:
           model: gpt-4o
+      embedding:
+        options:
+          model: text-embedding-3-small
       api-key: ${OPENAI_API_KEY}
   datasource:
     url: jdbc:postgresql://localhost:5432/turepulseai
