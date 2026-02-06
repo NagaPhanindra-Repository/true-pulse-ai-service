@@ -14,6 +14,10 @@ import com.codmer.turepulseai.util.DocumentChunker;
 import com.codmer.turepulseai.util.DocumentTextExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,6 +44,7 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
     private final DocumentChunker documentChunker;
     private final EmbeddingModel embeddingModel;
     private final EmbeddingService embeddingService;
+    private final ChatClient chatClient;
 
     @Override
     public DocumentUploadResponse uploadDocument(MultipartFile file, Long entityId, String displayName) {
@@ -152,35 +157,62 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
 
         int topK = request.getTopK() != null && request.getTopK() > 0 ? request.getTopK() : DEFAULT_TOP_K;
         float[] embedding = embeddingModel.embed(request.getQuery());
-        String embeddingLiteral = formatEmbedding(embedding);
+        String embeddingLiteral = formatEmbeddingForPostgres(embedding);
 
         List<Object[]> rows = businessDocumentChunkRepository.findSimilarChunksByEntityAndBusiness(
                 businessId, request.getEntityId(), request.getDisplayName().trim(), embeddingLiteral, topK);
 
-        List<DocumentSearchResponse.MatchedChunk> matches = new ArrayList<>();
+        List<String> contextChunks = new ArrayList<>();
         for (Object[] row : rows) {
-            DocumentSearchResponse.MatchedChunk match = DocumentSearchResponse.MatchedChunk.builder()
-                    .documentId(((Number) row[1]).longValue())
-                    .chunkIndex(((Number) row[3]).intValue())
-                    .content((String) row[4])
-                    .prevContent((String) row[5])
-                    .nextContent((String) row[6])
-                    .similarity(row[11] != null ? ((Number) row[11]).doubleValue() : null)
-                    .build();
-            matches.add(match);
+            if (row.length > 4 && row[4] != null) {
+                contextChunks.add((String) row[4]);
+            }
         }
+
+        String answer = generateRagAnswer(request.getQuery(), contextChunks);
 
         return DocumentSearchResponse.builder()
                 .businessId(businessId)
                 .entityId(request.getEntityId())
                 .displayName(request.getDisplayName().trim())
                 .query(request.getQuery())
-                .matches(matches)
+                .answer(answer)
                 .build();
     }
 
+    private String generateRagAnswer(String query, List<String> contextChunks) {
+        String contextText = contextChunks.isEmpty()
+                ? "No relevant context found."
+                : String.join("\n\n", contextChunks);
 
-    private String formatEmbedding(float[] embedding) {
+        String systemPrompt = """
+                You are a helpful assistant for small businesses. Answer the user's question using the provided context.
+                If the context does not contain the answer, say you do not have enough information.
+                Keep the response concise and practical.
+                """;
+
+        String userPrompt = """
+                Question: %s
+
+                Context:
+                %s
+
+                Provide a clear answer based only on the context above.
+                """.formatted(query, contextText);
+
+        Prompt prompt = new Prompt(List.of(
+                new SystemMessage(systemPrompt),
+                new UserMessage(userPrompt)
+        ));
+
+        return chatClient.prompt(prompt).call().content();
+    }
+
+    /**
+     * Format embedding array as PostgreSQL vector literal
+     * Format: [1.0, 2.0, 3.0, ...]
+     */
+    private String formatEmbeddingForPostgres(float[] embedding) {
         StringBuilder builder = new StringBuilder();
         builder.append("[");
         for (int i = 0; i < embedding.length; i++) {

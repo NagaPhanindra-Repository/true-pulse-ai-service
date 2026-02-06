@@ -1459,7 +1459,24 @@
             ]
           },
           {
-            "name": "Upload Business Document",
+            "name": "Upload Business Document - Menu",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "if (pm.response.code === 200) {",
+                    "    var jsonData = pm.response.json();",
+                    "    pm.environment.set('DOCUMENT_ID', jsonData.documentId);",
+                    "    pm.test('Document uploaded successfully', function () {",
+                    "        pm.expect(jsonData.status).to.equal('READY');",
+                    "    });",
+                    "}"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ],
             "request": {
               "method": "POST",
               "header": [
@@ -1474,7 +1491,7 @@
                   {
                     "key": "file",
                     "type": "file",
-                    "src": []
+                    "src": "/path/to/menu.pdf"
                   },
                   {
                     "key": "entityId",
@@ -1483,7 +1500,7 @@
                   },
                   {
                     "key": "displayName",
-                    "value": "TruePulse Cafe",
+                    "value": "Amaravathi Food STL",
                     "type": "text"
                   }
                 ]
@@ -1493,11 +1510,104 @@
                 "host": ["{{BASE_URL}}"],
                 "path": ["api", "business-documents", "upload"]
               },
-              "description": "Upload a document mapped to an entity using entityId + displayName (multipart form data)."
+              "description": "Upload a restaurant menu document. The document will be automatically chunked and embeddings will be generated for semantic search. Supported formats: PDF, DOC, DOCX, TXT, RTF"
             }
           },
           {
-            "name": "Search Business Documents",
+            "name": "Upload Business Document - Operating Hours",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "formdata",
+                "formdata": [
+                  {
+                    "key": "file",
+                    "type": "file",
+                    "src": "/path/to/operating_hours.pdf"
+                  },
+                  {
+                    "key": "entityId",
+                    "value": "1",
+                    "type": "text"
+                  },
+                  {
+                    "key": "displayName",
+                    "value": "Amaravathi Food STL",
+                    "type": "text"
+                  }
+                ]
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/upload",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "upload"]
+              },
+              "description": "Upload operating hours and policies document"
+            }
+          },
+          {
+            "name": "Upload Business Document - Service Info",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "formdata",
+                "formdata": [
+                  {
+                    "key": "file",
+                    "type": "file",
+                    "src": "/path/to/services.pdf"
+                  },
+                  {
+                    "key": "entityId",
+                    "value": "2",
+                    "type": "text"
+                  },
+                  {
+                    "key": "displayName",
+                    "value": "Luxury Spa & Wellness",
+                    "type": "text"
+                  }
+                ]
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/upload",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "upload"]
+              },
+              "description": "Upload service listings and pricing information"
+            }
+          },
+          {
+            "name": "Search Business Documents - Hours Query",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Search executed successfully', function () {",
+                    "    pm.expect(pm.response.code).to.equal(200);",
+                    "    var jsonData = pm.response.json();",
+                    "    pm.expect(jsonData.businessId).to.exist;",
+                    "    pm.expect(jsonData.entityId).to.equal(1);",
+                    "    pm.expect(jsonData.answer).to.exist;",
+                    "});"
+                  ],
+                  "type": "text/javascript"
+                }
+              }
+            ],
             "request": {
               "method": "POST",
               "header": [
@@ -1512,14 +1622,92 @@
               ],
               "body": {
                 "mode": "raw",
-                "raw": "{\n  \"entityId\": 1,\n  \"displayName\": \"TruePulse Cafe\",\n  \"query\": \"What are your business hours?\",\n  \"topK\": 5\n}"
+                "raw": "{\n  \"entityId\": 1,\n  \"displayName\": \"Amaravathi Food STL\",\n  \"query\": \"What are your opening hours and on which days are you closed?\",\n  \"topK\": 5\n}"
               },
               "url": {
                 "raw": "{{BASE_URL}}/api/business-documents/search",
                 "host": ["{{BASE_URL}}"],
                 "path": ["api", "business-documents", "search"]
               },
-              "description": "Search document chunks mapped to the given entityId + displayName."
+              "description": "Search for business hours and return a RAG-based answer only."
+            }
+          },
+          {
+            "name": "Search Business Documents - Menu Query",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"entityId\": 1,\n  \"displayName\": \"Amaravathi Food STL\",\n  \"query\": \"What vegetarian options do you have and what are the prices?\",\n  \"topK\": 5\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/search",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "search"]
+              },
+              "description": "Search for menu items and pricing and return a RAG-based answer only."
+            }
+          },
+          {
+            "name": "Search Business Documents - Service Query",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"entityId\": 2,\n  \"displayName\": \"Luxury Spa & Wellness\",\n  \"query\": \"What services do you offer and how much do they cost?\",\n  \"topK\": 5\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/search",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "search"]
+              },
+              "description": "Search for available services and pricing and return a RAG-based answer only."
+            }
+          },
+          {
+            "name": "Search Business Documents - Availability Query",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Authorization",
+                  "value": "Bearer {{JWT_TOKEN}}"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"entityId\": 1,\n  \"displayName\": \"Amaravathi Food STL\",\n  \"query\": \"Do you take reservations and what is your cancellation policy?\",\n  \"topK\": 5\n}"
+              },
+              "url": {
+                "raw": "{{BASE_URL}}/api/business-documents/search",
+                "host": ["{{BASE_URL}}"],
+                "path": ["api", "business-documents", "search"]
+              },
+              "description": "Search for reservation and cancellation policies and return a RAG-based answer only."
             }
           }
         ]

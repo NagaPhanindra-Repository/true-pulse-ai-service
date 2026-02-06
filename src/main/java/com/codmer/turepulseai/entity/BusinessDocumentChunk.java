@@ -2,9 +2,6 @@ package com.codmer.turepulseai.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.Type;
-import com.pgvector.PGvector;
-import com.codmer.turepulseai.config.VectorType;
 
 import java.time.LocalDateTime;
 
@@ -46,9 +43,8 @@ public class BusinessDocumentChunk {
     @Column(nullable = false)
     private Integer embeddingDimension;
 
-    @Type(VectorType.class)
-    @Column(columnDefinition = "vector(1536)", name = "embedding")
-    private PGvector embedding;
+    @Transient
+    private Object embedding;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

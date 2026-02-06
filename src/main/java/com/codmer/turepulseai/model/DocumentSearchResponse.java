@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,18 +14,5 @@ public class DocumentSearchResponse {
     private Long entityId;
     private String displayName;
     private String query;
-    private List<MatchedChunk> matches;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MatchedChunk {
-        private Long documentId;
-        private Integer chunkIndex;
-        private String content;
-        private String prevContent;
-        private String nextContent;
-        private Double similarity;
-    }
+    private String answer;
 }

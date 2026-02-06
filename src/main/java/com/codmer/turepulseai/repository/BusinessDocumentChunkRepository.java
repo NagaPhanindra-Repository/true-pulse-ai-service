@@ -17,7 +17,7 @@ public interface BusinessDocumentChunkRepository extends JpaRepository<BusinessD
 
     List<BusinessDocumentChunk> findByDocumentIdAndBusinessId(Long documentId, String businessId);
 
-    @Query(value = "SELECT * FROM business_document_chunks " +
+    @Query(value = "SELECT embedding <-> CAST(:embedding AS vector) as distance, * FROM business_document_chunks " +
             "WHERE business_id = :businessId " +
             "ORDER BY embedding <-> CAST(:embedding AS vector) " +
             "LIMIT :limit", nativeQuery = true)
@@ -25,7 +25,7 @@ public interface BusinessDocumentChunkRepository extends JpaRepository<BusinessD
                                      @Param("embedding") String embedding,
                                      @Param("limit") int limit);
 
-    @Query(value = "SELECT * FROM business_document_chunks " +
+    @Query(value = "SELECT embedding <-> CAST(:embedding AS vector) as distance, * FROM business_document_chunks " +
             "WHERE entity_id = :entityId AND display_name = :displayName " +
             "ORDER BY embedding <-> CAST(:embedding AS vector) " +
             "LIMIT :limit", nativeQuery = true)
@@ -34,7 +34,7 @@ public interface BusinessDocumentChunkRepository extends JpaRepository<BusinessD
                                              @Param("embedding") String embedding,
                                              @Param("limit") int limit);
 
-    @Query(value = "SELECT * FROM business_document_chunks " +
+    @Query(value = "SELECT embedding <-> CAST(:embedding AS vector) as distance, * FROM business_document_chunks " +
             "WHERE business_id = :businessId AND entity_id = :entityId AND display_name = :displayName " +
             "ORDER BY embedding <-> CAST(:embedding AS vector) " +
             "LIMIT :limit", nativeQuery = true)
