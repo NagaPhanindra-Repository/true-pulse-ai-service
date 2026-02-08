@@ -173,7 +173,8 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
 
         return DocumentSearchResponse.builder()
                 .businessId(businessId)
-                .entityId(request.getEntityId())
+                .entityId(request.getEntityId()
+                )
                 .displayName(request.getDisplayName().trim())
                 .query(request.getQuery())
                 .answer(answer)
@@ -186,9 +187,7 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
                 : String.join("\n\n", contextChunks);
 
         String systemPrompt = """
-                You are a helpful assistant for small businesses. Answer the user's question using the provided context.
-                If the context does not contain the answer, say you do not have enough information.
-                Keep the response concise and practical.
+                You are a customer care representative for small businesses. Answer questions based on the provided context. If you don't know the answer, respond politely that you don't have the information.
                 """;
 
         String userPrompt = """
