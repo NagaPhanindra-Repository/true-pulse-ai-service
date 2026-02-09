@@ -2,9 +2,9 @@ package com.codmer.turepulseai.service.impl;
 
 import com.codmer.turepulseai.entity.BusinessDocumentChunk;
 import com.codmer.turepulseai.repository.BusinessDocumentChunkRepository;
+import com.codmer.turepulseai.service.EmbeddingCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmbeddingService {
 
     private final BusinessDocumentChunkRepository chunkRepository;
-    private final EmbeddingModel embeddingModel;
+    private final EmbeddingCacheService embeddingCacheService;
     private final JdbcTemplate jdbcTemplate;
 
     /**
@@ -44,20 +44,10 @@ public class EmbeddingService {
     }
 
     /**
-     * Generate embedding for given text using Spring AI
+     * Generate embedding for given text using cached embeddings
      */
     private float[] generateEmbedding(String text) {
-        try {
-            var embedding = embeddingModel.embed(text);
-            float[] result = new float[embedding.length];
-            for (int i = 0; i < embedding.length; i++) {
-                result[i] = (float) embedding[i];
-            }
-            return result;
-        } catch (Exception e) {
-            log.error("Error generating embedding", e);
-            throw new RuntimeException("Failed to generate embedding", e);
-        }
+        return embeddingCacheService.embed(text);
     }
 
     /**

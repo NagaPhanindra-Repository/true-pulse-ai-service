@@ -347,7 +347,7 @@ public class RetroServiceImpl implements RetroService {
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Current Summary:\n" + currentSummary + "\n\nHistorical Summary:\n" + historicalSummary +
-                        "\n\nGenerate final 3-4 line summary."));
+                        "\n\nGenerate final 2-3 line summary."));
 
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();

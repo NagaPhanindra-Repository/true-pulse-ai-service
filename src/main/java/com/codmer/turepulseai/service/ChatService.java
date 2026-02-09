@@ -20,14 +20,21 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.annotation.PreDestroy;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,12 +46,17 @@ public class ChatService {
     private final QuestionRepository questionRepository;
     private final AnswerRepository answerRepository;
     private final UserRepository userRepository;
+    private final ExecutorService analysisExecutor = Executors.newFixedThreadPool(
+            Math.max(30, Runtime.getRuntime().availableProcessors())
+    );
 
+    @Cacheable(value = "chatResponses", key = "#question")
     public String getChatResponse(String question) {
         log.info("Received question: {}", question);
         return chatClient.prompt(question).call().content();
     }
 
+    @Cacheable(value = "chatResponses", key = "#request.message")
     public ChatResponse chatResponse(ChatRequest request) {
         log.info("Received question: {}", request);
 
@@ -83,6 +95,8 @@ public class ChatService {
      * @param userMessage         - Optional message from the question creator for contextual guidance
      * @return QuestionChatResponse with concise 2-3 line analysis
      */
+    @Cacheable(value = "questionAnalysis",
+               key = "#questionId + '_' + #allAnswers.size() + '_' + (#userMessage != null ? #userMessage.hashCode() : '')")
     public QuestionChatResponse analyzeQuestionAnswers(Long questionId, String questionTitle,
                                                        String questionDescription,
                                                        List<String> allAnswers,
@@ -160,6 +174,8 @@ public class ChatService {
      * @param allAnswers          - List of all answer contents for context
      * @return SpecificFeedbackResponse with 3-line analysis
      */
+    @Cacheable(value = "specificFeedback",
+               key = "#questionId + '_' + #specificFeedback.hashCode() + '_' + #allAnswers.size()")
     public SpecificFeedbackResponse analyzeSpecificFeedback(Long questionId, String questionTitle,
                                                             String questionDescription,
                                                             String specificFeedback,
@@ -239,6 +255,8 @@ public class ChatService {
      * @param allAnswers          - List of all answer contents
      * @return UserQuestionsAnalysisResponse with comprehensive analysis
      */
+    @Cacheable(value = "userQuestionsAnalysis",
+               key = "#questionId + '_' + #allAnswers.size()")
     public UserQuestionsAnalysisResponse analyzeUserQuestion(Long questionId, String questionTitle,
                                                              String questionDescription,
                                                              List<String> allAnswers) {
@@ -545,6 +563,9 @@ public class ChatService {
      * @param questionChatRequest - Contains question ID and optional guidance message
      * @return QuestionChatResponse with comprehensive analysis
      */
+    @Cacheable(value = "questionData",
+               key = "#questionChatRequest.questionId + '_analysis_' + (#questionChatRequest.message != null ? #questionChatRequest.message.hashCode() : '')",
+               unless = "#result.analysis.contains('No answers received yet')")
     public QuestionChatResponse analyzeQuestionAnswersFromRequest(QuestionChatRequest questionChatRequest) {
         log.info("Analyzing question from request - Question ID: {}", questionChatRequest.getQuestionId());
 
@@ -594,6 +615,9 @@ public class ChatService {
      * @param specificFeedbackRequest - Contains question ID and specific feedback
      * @return SpecificFeedbackResponse with contextual analysis
      */
+    @Cacheable(value = "specificFeedback",
+               key = "#specificFeedbackRequest.questionId + '_' + #specificFeedbackRequest.specificFeedback.hashCode()",
+               unless = "#result.analysis.contains('no other answers')")
     public SpecificFeedbackResponse analyzeSpecificFeedbackFromRequest(SpecificFeedbackRequest specificFeedbackRequest) {
         log.info("Analyzing specific feedback from request - Question ID: {}", specificFeedbackRequest.getQuestionId());
 
@@ -648,6 +672,8 @@ public class ChatService {
      *
      * @return List of UserQuestionsAnalysisResponse with comprehensive analysis per question
      */
+    @Cacheable(value = "userQuestionsAnalysis",
+               key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public List<UserQuestionsAnalysisResponse> analyzeMyQuestionsForLoggedInUser() {
         log.info("Analyzing all questions for logged-in user");
 
@@ -671,52 +697,63 @@ public class ChatService {
             return new ArrayList<>();
         }
 
-        // Analyze each question
-        List<UserQuestionsAnalysisResponse> analysisResults = new ArrayList<>();
-
+        // Parallelized flow: fetch answers + analyze per question in separate tasks.
+        List<CompletableFuture<UserQuestionsAnalysisResponse>> futures = new ArrayList<>();
         for (Question question : userQuestions) {
-            log.info("Analyzing question ID: {} - '{}'", question.getId(), question.getTitle());
-
-            // Fetch all answers for this question
-            List<Answer> answers = answerRepository.findByQuestionIdOrderByCreatedAtDesc(question.getId());
-
-            log.info("Found {} answers for question ID: {}", answers.size(), question.getId());
-
-            // Handle questions with no answers
-            if (answers.isEmpty()) {
-                log.warn("No answers found for question ID: {} - creating placeholder response", question.getId());
-                UserQuestionsAnalysisResponse placeholderResponse = createPlaceholderResponse(question);
-                analysisResults.add(placeholderResponse);
-                continue;
-            }
-
-            // Extract answer contents
-            List<String> answerContents = answers.stream()
-                    .map(Answer::getContent)
-                    .collect(Collectors.toList());
-
-            // Perform AI analysis
-            try {
-                UserQuestionsAnalysisResponse analysisResponse = analyzeUserQuestion(
-                        question.getId(),
-                        question.getTitle(),
-                        question.getDescription(),
-                        answerContents
-                );
-
-                analysisResults.add(analysisResponse);
-                log.info("Successfully analyzed question ID: {}", question.getId());
-
-            } catch (Exception e) {
-                log.error("Error analyzing question ID: {}", question.getId(), e);
-                UserQuestionsAnalysisResponse errorResponse = createErrorResponse(question, answers.size());
-                analysisResults.add(errorResponse);
-            }
+            futures.add(CompletableFuture.supplyAsync(() -> analyzeSingleQuestion(question), analysisExecutor));
         }
+
+        List<UserQuestionsAnalysisResponse> analysisResults = futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
 
         log.info("Completed analysis of {} questions for user ID: {}", analysisResults.size(), user.getId());
 
         return analysisResults;
+    }
+
+    private UserQuestionsAnalysisResponse analyzeSingleQuestion(Question question) {
+        log.info("Analyzing question ID: {} - '{}'", question.getId(), question.getTitle());
+
+        List<Answer> answers = answerRepository.findByQuestionIdOrderByCreatedAtDesc(question.getId());
+        log.info("Found {} answers for question ID: {}", answers.size(), question.getId());
+
+        if (answers.isEmpty()) {
+            log.warn("No answers found for question ID: {} - creating placeholder response", question.getId());
+            return createPlaceholderResponse(question);
+        }
+
+        List<String> answerContents = answers.stream()
+                .map(Answer::getContent)
+                .collect(Collectors.toList());
+
+        try {
+            UserQuestionsAnalysisResponse analysisResponse = analyzeUserQuestion(
+                    question.getId(),
+                    question.getTitle(),
+                    question.getDescription(),
+                    answerContents
+            );
+
+            log.info("Successfully analyzed question ID: {}", question.getId());
+            return analysisResponse;
+        } catch (Exception e) {
+            log.error("Error analyzing question ID: {}", question.getId(), e);
+            return createErrorResponse(question, answers.size());
+        }
+    }
+
+    @PreDestroy
+    void shutdownAnalysisExecutor() {
+        analysisExecutor.shutdown();
+        try {
+            if (!analysisExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                analysisExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            analysisExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -758,7 +795,9 @@ public class ChatService {
         errorResponse.setCreatedAt(Instant.now().getEpochSecond());
         return errorResponse;
     }
+
+    @CacheEvict(value = {"questionAnalysis", "specificFeedback", "userQuestionsAnalysis", "questionData"}, allEntries = true)
+    public void evictAnalysisCaches() {
+        log.info("Evicted analysis caches due to data change");
+    }
 }
-    // ...existing analyzeQuestionAnswers method...
-    // ...existing analyzeSpecificFeedback method...
-    // ...existing analyzeUserQuestion method...

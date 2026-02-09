@@ -9,6 +9,7 @@ import com.codmer.turepulseai.repository.QuestionRepository;
 import com.codmer.turepulseai.repository.UserRepository;
 import com.codmer.turepulseai.service.AnswerService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class AnswerServiceImpl implements AnswerService {
     private final UserRepository userRepository;
 
     @Override
+    @CacheEvict(value = {"questionAnalysis", "specificFeedback", "userQuestionsAnalysis", "questionData"}, allEntries = true)
     public AnswerDto create(AnswerDto dto) {
         if (dto.getQuestionId() == null || dto.getUserId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "questionId and userId are required");
@@ -81,6 +83,7 @@ public class AnswerServiceImpl implements AnswerService {
     }
 
     @Override
+    @CacheEvict(value = {"questionAnalysis", "specificFeedback", "userQuestionsAnalysis", "questionData"}, allEntries = true)
     public AnswerDto update(Long id, AnswerDto dto) {
         // Validate that path ID matches dto ID if provided
         if (dto.getId() != null && !id.equals(dto.getId())) {
@@ -111,6 +114,7 @@ public class AnswerServiceImpl implements AnswerService {
     }
 
     @Override
+    @CacheEvict(value = {"questionAnalysis", "specificFeedback", "userQuestionsAnalysis", "questionData"}, allEntries = true)
     public void delete(Long id) {
         if (!answerRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Answer not found");

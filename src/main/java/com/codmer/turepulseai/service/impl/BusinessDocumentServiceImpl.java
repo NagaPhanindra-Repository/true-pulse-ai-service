@@ -10,6 +10,7 @@ import com.codmer.turepulseai.repository.BusinessDocumentChunkRepository;
 import com.codmer.turepulseai.repository.BusinessDocumentRepository;
 import com.codmer.turepulseai.repository.UserRepository;
 import com.codmer.turepulseai.service.BusinessDocumentService;
+import com.codmer.turepulseai.service.EmbeddingCacheService;
 import com.codmer.turepulseai.util.DocumentChunker;
 import com.codmer.turepulseai.util.DocumentTextExtractor;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -42,11 +44,12 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
     private final UserRepository userRepository;
     private final DocumentTextExtractor documentTextExtractor;
     private final DocumentChunker documentChunker;
-    private final EmbeddingModel embeddingModel;
+    private final EmbeddingCacheService embeddingCacheService;
     private final EmbeddingService embeddingService;
     private final ChatClient chatClient;
 
     @Override
+    @CacheEvict(value = "ragAnswers", allEntries = true, beforeInvocation = false)
     public DocumentUploadResponse uploadDocument(MultipartFile file, Long entityId, String displayName) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "document file is required");
@@ -93,13 +96,7 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
                     .build();
         }
 
-        int dimension = 1536; // Default dimension for OpenAI embeddings, fallback to this
-
-        try {
-            dimension = embeddingModel.dimensions();
-        } catch (Exception e) {
-            log.warn("Could not determine embedding dimensions. Using default dimension: " + dimension, e);
-        }
+        int dimension = embeddingCacheService.dimensions();
 
         final int finalDimension = dimension;
         for (DocumentChunker.Chunk chunk : chunks) {
@@ -141,6 +138,8 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "ragAnswers",
+               key = "#request.entityId + '_' + #request.displayName + '_' + #request.query.hashCode()")
     public DocumentSearchResponse searchDocuments(DocumentSearchRequest request) {
         if (request == null || request.getEntityId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entityId is required");
@@ -156,7 +155,7 @@ public class BusinessDocumentServiceImpl implements BusinessDocumentService {
         String businessId = user.getUserName();
 
         int topK = request.getTopK() != null && request.getTopK() > 0 ? request.getTopK() : DEFAULT_TOP_K;
-        float[] embedding = embeddingModel.embed(request.getQuery());
+        float[] embedding = embeddingCacheService.embed(request.getQuery());
         String embeddingLiteral = formatEmbeddingForPostgres(embedding);
 
         List<Object[]> rows = businessDocumentChunkRepository.findSimilarChunksByEntityAndBusiness(

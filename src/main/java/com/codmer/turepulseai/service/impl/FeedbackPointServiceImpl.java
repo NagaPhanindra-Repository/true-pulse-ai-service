@@ -260,7 +260,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Current Analysis:\n" + currentSummary + "\n\nHistorical Analysis:\n" + historicalSummary +
-                        "\n\nGenerate final summary."));
+                        "\n\nGenerate final summary in 1-2 lines."));
 
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();
