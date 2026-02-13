@@ -1,7 +1,10 @@
 package com.codmer.turepulseai.entity;
 
+import com.codmer.turepulseai.config.PGVectorType;
+import com.pgvector.PGvector;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 
@@ -9,7 +12,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "business_document_chunks", indexes = {
         @Index(name = "idx_doc_chunks_document_id", columnList = "document_id"),
-        @Index(name = "idx_doc_chunks_business_id", columnList = "business_id")
+        @Index(name = "idx_doc_chunks_business_id", columnList = "business_id"),
+        @Index(name = "idx_doc_chunks_entity_id", columnList = "entity_id")
 })
 public class BusinessDocumentChunk {
     @Id
@@ -43,8 +47,16 @@ public class BusinessDocumentChunk {
     @Column(nullable = false)
     private Integer embeddingDimension;
 
-    @Transient
-    private Object embedding;
+    /**
+     * Store embedding as PGvector for efficient similarity search in PostgreSQL
+     * Uses pgvector extension for vector operations and HNSW indexing
+     */
+    @Column(name = "embedding", columnDefinition = "vector(1536)", nullable = false)
+    @Type(PGVectorType.class)
+    private PGvector embedding;
+
+    @Column(name = "created_by", length = 255)
+    private String createdBy;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

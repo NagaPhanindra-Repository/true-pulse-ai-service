@@ -1,5 +1,6 @@
 package com.codmer.turepulseai.service;
 
+import com.pgvector.PGvector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -21,6 +22,19 @@ public class EmbeddingCacheService {
             result[i] = (float) embedding[i];
         }
         return result;
+    }
+
+    /**
+     * Directly embed text and return as PGvector without intermediate float array conversion
+     */
+    @Cacheable(value = "embeddings", key = "#text.hashCode()")
+    public PGvector embedAsVector(String text) {
+        var embedding = embeddingModel.embed(text);
+        float[] result = new float[embedding.length];
+        for (int i = 0; i < embedding.length; i++) {
+            result[i] = (float) embedding[i];
+        }
+        return new PGvector(result);
     }
 
     public int dimensions() {
