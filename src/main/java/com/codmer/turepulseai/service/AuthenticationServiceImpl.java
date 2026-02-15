@@ -73,7 +73,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             user.setGender(null);
         }
         Set<Role> roles = new HashSet<>();
-        Role role = roleRepository.findByName(createUserDto.getRoleName())
+        Role role = roleRepository.findByName(UserType.USER.name())
                 .orElseThrow(() -> new IllegalArgumentException("Role not found: " + createUserDto.getRoleName()));
         roles.add(role);
         user.setRoles(roles);
