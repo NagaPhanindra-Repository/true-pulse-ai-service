@@ -4,6 +4,7 @@ package com.codmer.turepulseai.config;
 import com.codmer.turepulseai.security.JwtAuthenticationEntryPoint;
 import com.codmer.turepulseai.security.JwtAuthenticationFilter;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -25,6 +26,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 @AllArgsConstructor
@@ -33,6 +35,9 @@ public class SpringSecurityConfig {
     private UserDetailsService userDetailsService;
     private JwtAuthenticationEntryPoint authenticationEntryPoint;
     private JwtAuthenticationFilter filter;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOriginsProp;
 
     @Bean
     public static PasswordEncoder passwordEncoder() {
@@ -78,11 +83,13 @@ public class SpringSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Replace with properties or environment variables (do not use "*" when allowCredentials = true)
-        List<String> allowedOrigins = Arrays.asList("http://localhost:4200", "http://localhost:5173");
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        // explicitly allow Authorization header along with common headers
+        List<String> allowedOrigins = resolveAllowedOrigins();
+        if (allowedOrigins.stream().anyMatch(origin -> origin.contains("*"))) {
+            config.setAllowedOriginPatterns(allowedOrigins);
+        } else {
+            config.setAllowedOrigins(allowedOrigins);
+        }
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "Accept"));
         config.setExposedHeaders(Arrays.asList("Authorization"));
         config.setAllowCredentials(true);
@@ -91,6 +98,16 @@ public class SpringSecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private List<String> resolveAllowedOrigins() {
+        if (allowedOriginsProp == null || allowedOriginsProp.trim().isEmpty()) {
+            return Arrays.asList("http://localhost:4200", "http://localhost:5173");
+        }
+        return Arrays.stream(allowedOriginsProp.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toList());
     }
 
 
