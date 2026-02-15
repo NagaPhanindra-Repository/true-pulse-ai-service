@@ -6,7 +6,9 @@ import com.codmer.turepulseai.entity.Retro;
 import com.codmer.turepulseai.repository.FeedbackPointRepository;
 import com.codmer.turepulseai.repository.RetroRepository;
 import com.codmer.turepulseai.service.FeedbackPointService;
+import com.codmer.turepulseai.util.RateLimitHandler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +20,11 @@ import com.codmer.turepulseai.entity.ActionItem;
 import com.codmer.turepulseai.entity.Discussion;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -28,6 +33,8 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
     private final FeedbackPointRepository feedbackPointRepository;
     private final RetroRepository retroRepository;
     private final org.springframework.ai.chat.client.ChatClient chatClient;
+    private final RateLimitHandler rateLimitHandler;
+    private final Executor aiAnalysisExecutor;
 
     @Override
     public FeedbackPointDto create(FeedbackPointDto dto) {
@@ -84,6 +91,9 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "retroId and feedbackPointId are required");
         }
 
+        long startTime = System.currentTimeMillis();
+        log.info("Starting feedback analysis for retroId={}, feedbackPointId={}", request.getRetroId(), request.getFeedbackPointId());
+
         Retro retro = fetchRetro(request.getRetroId());
         FeedbackPoint currentPoint = feedbackPointRepository.findById(request.getFeedbackPointId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Feedback point not found"));
@@ -92,15 +102,53 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Feedback point does not belong to the provided retro");
         }
 
+        // Build contexts (fast operations, can be parallelized)
+        long contextStartTime = System.currentTimeMillis();
         String currentContext = buildCurrentFeedbackContext(retro, currentPoint);
-        String currentSummary = summarizeCurrentFeedback(currentContext);
 
         List<Retro> pastRetros = retroRepository.findByUserIdAndCreatedAtBeforeOrderByCreatedAtDesc(
                 retro.getUser().getId(), retro.getCreatedAt());
         String historyContext = buildHistoricalFeedbackContext(pastRetros, currentPoint);
-        String historicalSummary = summarizeHistoricalFeedback(historyContext);
+        long contextElapsedMs = System.currentTimeMillis() - contextStartTime;
+        log.debug("Context building completed in {}ms", contextElapsedMs);
 
-        String finalSummary = mergeFeedbackSummaries(currentSummary, historicalSummary);
+        // Execute summarization tasks in PARALLEL for better performance
+        long summaryStartTime = System.currentTimeMillis();
+        CompletableFuture<String> currentSummaryFuture = CompletableFuture.supplyAsync(
+                () -> summarizeCurrentFeedback(currentContext),
+                aiAnalysisExecutor
+        );
+
+        CompletableFuture<String> historicalSummaryFuture = CompletableFuture.supplyAsync(
+                () -> summarizeHistoricalFeedback(historyContext),
+                aiAnalysisExecutor
+        );
+
+        // Wait for both summaries to complete
+        CompletableFuture<String> currentSummary = currentSummaryFuture
+                .exceptionally(ex -> {
+                    log.error("Error in current summary task: {}", ex.getMessage());
+                    return "Unable to analyze current feedback at this moment. Please try again.";
+                });
+
+        CompletableFuture<String> historicalSummary = historicalSummaryFuture
+                .exceptionally(ex -> {
+                    log.error("Error in historical summary task: {}", ex.getMessage());
+                    return "Unable to analyze historical patterns at this moment. Please try again.";
+                });
+
+        // Combine results
+        String finalSummary = currentSummary.thenCombine(historicalSummary, this::mergeFeedbackSummaries)
+                .exceptionally(ex -> {
+                    log.error("Error in merge summary task: {}", ex.getMessage());
+                    return "Analysis completed with limitations. Please try again for full analysis.";
+                })
+                .join();  // Block and wait for result
+
+        long summaryElapsedMs = System.currentTimeMillis() - summaryStartTime;
+        long totalElapsedMs = System.currentTimeMillis() - startTime;
+
+        log.info("Feedback analysis completed in {}ms (summaries: {}ms)", totalElapsedMs, summaryElapsedMs);
 
         return new FeedbackPointAnalysisResponse(
                 retro.getId(),
@@ -111,7 +159,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
     }
 
     private String buildCurrentFeedbackContext(Retro retro, FeedbackPoint currentPoint) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(256);  // Pre-allocate capacity
         sb.append("Retro Title: ").append(retro.getTitle()).append("\n");
         sb.append("Retro Description: ").append(retro.getDescription()).append("\n");
         sb.append("Feedback Type: ").append(currentPoint.getType()).append("\n");
@@ -148,7 +196,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         }
 
         String currentText = currentPoint.getDescription() != null ? currentPoint.getDescription() : "";
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(512);  // Pre-allocate capacity
         sb.append("Past retros with similar feedback or patterns:\n");
 
         for (Retro retro : pastRetros) {
@@ -220,9 +268,16 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 context + "\nSummarize current feedback in 5-7 sentences."));
 
-        var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
-        String content = response.content();
-        return content == null ? "No current feedback analysis available." : content.trim();
+        try {
+            String content = rateLimitHandler.executeWithRateLimitRetry(() -> {
+                var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
+                return response.content();
+            }, "summarizeCurrentFeedback");
+            return content == null ? "No current feedback analysis available." : content.trim();
+        } catch (Exception ex) {
+            log.error("Error summarizing current feedback", ex);
+            throw ex;
+        }
     }
 
     private String summarizeHistoricalFeedback(String history) {
@@ -237,9 +292,16 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 history + "\nSummarize historical patterns in 4-6 sentences."));
 
-        var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
-        String content = response.content();
-        return content == null ? "No historical feedback analysis available." : content.trim();
+        try {
+            String content = rateLimitHandler.executeWithRateLimitRetry(() -> {
+                var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
+                return response.content();
+            }, "summarizeHistoricalFeedback");
+            return content == null ? "No historical feedback analysis available." : content.trim();
+        } catch (Exception ex) {
+            log.error("Error summarizing historical feedback", ex);
+            throw ex;
+        }
     }
 
     private String mergeFeedbackSummaries(String currentSummary, String historicalSummary) {
@@ -262,9 +324,16 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                 "Current Analysis:\n" + currentSummary + "\n\nHistorical Analysis:\n" + historicalSummary +
                         "\n\nGenerate final summary in 1-2 lines."));
 
-        var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
-        String content = response.content();
-        return content == null ? "No combined analysis available." : content.trim();
+        try {
+            String content = rateLimitHandler.executeWithRateLimitRetry(() -> {
+                var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
+                return response.content();
+            }, "mergeFeedbackSummaries");
+            return content == null ? "No combined analysis available." : content.trim();
+        } catch (Exception ex) {
+            log.error("Error merging feedback summaries", ex);
+            throw ex;
+        }
     }
 
     private Retro fetchRetro(Long id) {
@@ -274,7 +343,6 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         return retroRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Retro not found"));
     }
-
 
     private FeedbackPointDto toDto(FeedbackPoint f) {
         return new FeedbackPointDto(

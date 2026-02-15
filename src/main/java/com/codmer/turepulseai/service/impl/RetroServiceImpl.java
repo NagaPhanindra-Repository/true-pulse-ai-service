@@ -12,6 +12,7 @@ import com.codmer.turepulseai.repository.RetroRepository;
 import com.codmer.turepulseai.repository.UserRepository;
 import com.codmer.turepulseai.service.RetroService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,8 +20,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -29,6 +34,7 @@ public class RetroServiceImpl implements RetroService {
     private final RetroRepository retroRepository;
     private final UserRepository userRepository;
     private final org.springframework.ai.chat.client.ChatClient chatClient;
+    private final Executor aiAnalysisExecutor;
 
 
     @Override
@@ -213,18 +219,91 @@ public class RetroServiceImpl implements RetroService {
     @Override
     @Transactional(readOnly = true)
     public RetroAnalysisResponse analyzeRetro(Long retroId) {
+        log.info("Starting retro analysis for retroId: {}", retroId);
+        long startTime = System.currentTimeMillis();
+
         Retro retro = retroRepository.findById(retroId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Retro not found"));
 
-        String currentRetroContext = buildCurrentRetroContext(retro);
-        String currentRetroSummary = summarizeCurrentRetro(retro, currentRetroContext);
+        try {
+            // IMPORTANT: Eagerly load all lazy collections BEFORE passing to async executor
+            // This ensures all data is loaded in the current Hibernate session
+            initializeRetroCollections(retro);
 
-        List<Retro> pastRetros = retroRepository.findByUserIdAndCreatedAtBeforeOrderByCreatedAtDesc(
-                retro.getUser().getId(), retro.getCreatedAt());
-        String pastRetrosSummary = summarizePastRetros(retro.getUser().getUserName(), pastRetros);
+            // Fetch past retros and initialize their collections while still in session
+            List<Retro> pastRetros = retroRepository.findByUserIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                    retro.getUser().getId(), retro.getCreatedAt());
+            pastRetros.forEach(this::initializeRetroCollections);
 
-        String finalSummary = mergeSummaries(currentRetroSummary, pastRetrosSummary);
-        return new RetroAnalysisResponse(retro.getId(), finalSummary);
+            String retroUserName = retro.getUser().getUserName();
+
+            // Build context for current retro (synchronous, lightweight)
+            String currentRetroContext = buildCurrentRetroContext(retro);
+
+            // Execute current retro summarization and past retros analysis in parallel
+            // Now safe to use async because all collections are already loaded
+            CompletableFuture<String> currentSummaryFuture = CompletableFuture
+                    .supplyAsync(() -> {
+                        log.debug("Starting current retro summarization");
+                        return summarizeCurrentRetro(retro, currentRetroContext);
+                    }, aiAnalysisExecutor)
+                    .exceptionally(ex -> {
+                        log.error("Error summarizing current retro: {}", ex.getMessage(), ex);
+                        throw new CompletionException("Failed to summarize current retro", ex);
+                    });
+
+            CompletableFuture<String> pastRetrosSummaryFuture = CompletableFuture
+                    .supplyAsync(() -> {
+                        log.debug("Starting past retros analysis");
+                        return summarizePastRetros(retroUserName, pastRetros);
+                    }, aiAnalysisExecutor)
+                    .exceptionally(ex -> {
+                        log.error("Error summarizing past retros: {}", ex.getMessage(), ex);
+                        throw new CompletionException("Failed to summarize past retros", ex);
+                    });
+
+            // Wait for both summaries to complete
+            String currentSummary = currentSummaryFuture.join();
+            String pastRetrosSummary = pastRetrosSummaryFuture.join();
+
+            // Merge summaries (sequential, depends on both summaries)
+            String finalSummary = mergeSummaries(currentSummary, pastRetrosSummary);
+
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("Retro analysis completed for retroId: {} in {}ms", retroId, duration);
+
+            return new RetroAnalysisResponse(retro.getId(), finalSummary);
+
+        } catch (Exception ex) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("Error analyzing retro: {} after {}ms", ex.getMessage(), duration, ex);
+            // Exception will be caught by GlobalExceptionHandler
+            throw ex;
+        }
+    }
+
+    /**
+     * Initialize all lazy-loaded collections in a Retro object.
+     * Must be called while within a Hibernate session.
+     */
+    private void initializeRetroCollections(Retro retro) {
+        // Force initialization of feedback points collection
+        if (retro.getFeedbackPoints() != null) {
+            //noinspection ResultOfMethodCallIgnored
+            retro.getFeedbackPoints().size(); // Trigger lazy load
+            // Also initialize nested discussions
+            for (FeedbackPoint fp : retro.getFeedbackPoints()) {
+                if (fp.getDiscussions() != null) {
+                    //noinspection ResultOfMethodCallIgnored
+                    fp.getDiscussions().size(); // Trigger lazy load
+                }
+            }
+        }
+        // Force initialization of action items collection
+        if (retro.getActionItems() != null) {
+            //noinspection ResultOfMethodCallIgnored
+            retro.getActionItems().size(); // Trigger lazy load
+        }
     }
 
     private String buildCurrentRetroContext(Retro retro) {
@@ -267,6 +346,11 @@ public class RetroServiceImpl implements RetroService {
     }
 
     private String summarizeCurrentRetro(Retro retro, String context) {
+        return executeWithRetry(() -> summarizeCurrentRetroInternal(retro, context),
+                "Summarize current retro", 3);
+    }
+
+    private String summarizeCurrentRetroInternal(Retro retro, String context) {
         String systemPrompt = """
                 You are a senior Scrum Master and retrospective facilitator.
                 Analyze the current sprint retro feedback and action items.
@@ -292,6 +376,11 @@ public class RetroServiceImpl implements RetroService {
     }
 
     private String summarizePastRetros(String scrumMasterUserName, List<Retro> pastRetros) {
+        return executeWithRetry(() -> summarizePastRetrosInternal(scrumMasterUserName, pastRetros),
+                "Summarize past retros", 3);
+    }
+
+    private String summarizePastRetrosInternal(String scrumMasterUserName, List<Retro> pastRetros) {
         if (pastRetros == null || pastRetros.isEmpty()) {
             return "No past retros available to identify historical patterns.";
         }
@@ -332,6 +421,11 @@ public class RetroServiceImpl implements RetroService {
     }
 
     private String mergeSummaries(String currentSummary, String historicalSummary) {
+        return executeWithRetry(() -> mergeSummariesInternal(currentSummary, historicalSummary),
+                "Merge summaries", 3);
+    }
+
+    private String mergeSummariesInternal(String currentSummary, String historicalSummary) {
         String systemPrompt = """
                 You are a senior retrospective facilitator.
                 Combine the current sprint summary and historical patterns into a single final insight.
@@ -352,5 +446,53 @@ public class RetroServiceImpl implements RetroService {
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();
         return content == null ? "No combined analysis available" : content.trim();
+    }
+
+    /**
+     * Generic retry method with exponential backoff.
+     * Retries up to maxRetries times with increasing delays.
+     * Does NOT propagate user-facing exceptions to avoid forcing logout.
+     */
+    @SuppressWarnings({"unused", "SameParameterValue"})
+    private <T> T executeWithRetry(java.util.function.Supplier<T> operation, String operationName, int maxRetries) {
+        int attempt = 0;
+        long delayMs = 500; // Initial delay 500ms
+
+        while (attempt < maxRetries) {
+            try {
+                log.debug("Attempting {} (attempt {}/{})", operationName, attempt + 1, maxRetries);
+                return operation.get();
+            } catch (org.springframework.ai.retry.NonTransientAiException ex) {
+                attempt++;
+
+                // Check if it's a rate limit error
+                if (ex.getMessage() != null && (ex.getMessage().contains("429") || ex.getMessage().contains("rate_limit_exceeded"))) {
+                    if (attempt < maxRetries) {
+                        log.warn("Rate limit hit on {}, retrying after {}ms (attempt {}/{})",
+                                operationName, delayMs, attempt, maxRetries);
+                        try {
+                            Thread.sleep(delayMs);
+                            delayMs *= 2; // Exponential backoff
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            log.error("Retry interrupted for {}", operationName);
+                            throw ex;
+                        }
+                    } else {
+                        log.error("Max retries exceeded for {}", operationName);
+                        throw ex;
+                    }
+                } else {
+                    // Non-retryable error, propagate immediately
+                    log.error("Non-retryable error in {}: {}", operationName, ex.getMessage());
+                    throw ex;
+                }
+            } catch (Exception ex) {
+                log.error("Unexpected error in {}: {}", operationName, ex.getMessage());
+                throw ex;
+            }
+        }
+
+        throw new RuntimeException("Failed to complete " + operationName + " after " + maxRetries + " retries");
     }
 }
