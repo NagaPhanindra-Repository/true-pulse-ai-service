@@ -3,7 +3,7 @@ package com.codmer.turepulseai.config;
 
 import com.codmer.turepulseai.security.JwtAuthenticationEntryPoint;
 import com.codmer.turepulseai.security.JwtAuthenticationFilter;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,12 +29,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Configuration
-@AllArgsConstructor
+@RequiredArgsConstructor
 @EnableMethodSecurity
 public class SpringSecurityConfig {
-    private UserDetailsService userDetailsService;
-    private JwtAuthenticationEntryPoint authenticationEntryPoint;
-    private JwtAuthenticationFilter filter;
+    private final UserDetailsService userDetailsService;
+    private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final JwtAuthenticationFilter filter;
 
     @Value("${app.cors.allowed-origins:}")
     private String allowedOriginsProp;
