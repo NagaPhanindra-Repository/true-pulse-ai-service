@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 @Data
 @Entity
-@Table(name = "feedback_points", indexes = {@Index(name = "idx_retro_id", columnList = "retro_id")})
+@Table(name = "feedback_points", indexes = {@Index(name = "idx_feedback_points_retro_id", columnList = "retro_id")})
 public class FeedbackPoint {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
