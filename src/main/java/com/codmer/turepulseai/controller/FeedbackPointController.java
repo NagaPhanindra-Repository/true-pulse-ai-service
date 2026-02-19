@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/feedback-points")
+@RequestMapping("/api/public/feedback-points")
 @RequiredArgsConstructor
 public class FeedbackPointController {
 

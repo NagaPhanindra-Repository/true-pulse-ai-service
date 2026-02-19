@@ -10,7 +10,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/action-items")
+@RequestMapping("/api/public/action-items")
 @RequiredArgsConstructor
 public class ActionItemController {
 

@@ -40,13 +40,13 @@ public class EntityProfileController {
         return ResponseEntity.ok(entityProfileService.getMyEntitiesWithDetails(username));
     }
 
-    @GetMapping("/random")
+    @GetMapping("/public/random")
     public ResponseEntity<List<EntityDetailResponse>> getRandomEntities(
             @RequestParam(value = "limit", required = false, defaultValue = "10") int limit) {
         return ResponseEntity.ok(entityProfileService.getRandomEntities(limit));
     }
 
-    @GetMapping("/search")
+    @GetMapping("/public/search")
     public ResponseEntity<List<EntityDetailResponse>> searchEntities(
             @RequestParam("q") String searchTerm) {
         return ResponseEntity.ok(entityProfileService.searchEntitiesByName(searchTerm));

@@ -67,7 +67,7 @@ public class RetroController {
      * @param id - Retro ID
      * @return RetroDetailDto with all nested data
      */
-    @GetMapping("/{id}/details")
+    @GetMapping("/public/{id}/details")
     public ResponseEntity<RetroDetailDto> getRetroDetails(@PathVariable Long id) {
         RetroDetailDto details = retroService.getRetroDetails(id);
         return ResponseEntity.ok(details);
@@ -90,7 +90,7 @@ public class RetroController {
      * @param id - Retro ID
      * @return RetroAnalysisResponse with concise summary
      */
-    @GetMapping("/{id}/analysis")
+    @GetMapping("/public/{id}/analysis")
     public ResponseEntity<RetroAnalysisResponse> analyzeRetro(@PathVariable Long id) {
         return ResponseEntity.ok(retroService.analyzeRetro(id));
     }

@@ -28,7 +28,7 @@ public class BusinessDocumentController {
         return ResponseEntity.ok(businessDocumentService.uploadDocument(file, entityId, displayName));
     }
 
-    @PostMapping("/search")
+    @PostMapping("/public/search")
     public ResponseEntity<DocumentSearchResponse> searchDocuments(@RequestBody DocumentSearchRequest request) {
         log.info("Searching documents for entityId: {}, displayName: {}", request.getEntityId(), request.getDisplayName());
         return ResponseEntity.ok(businessDocumentService.searchDocuments(request));

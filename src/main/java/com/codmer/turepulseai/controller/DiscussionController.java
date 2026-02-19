@@ -10,7 +10,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/discussions")
+@RequestMapping("/api/public/discussions")
 @RequiredArgsConstructor
 public class DiscussionController {
 
