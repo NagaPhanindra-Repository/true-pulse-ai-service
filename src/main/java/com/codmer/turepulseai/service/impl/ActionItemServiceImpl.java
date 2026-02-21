@@ -4,6 +4,7 @@ import com.codmer.turepulseai.model.ActionItemDto;
 import com.codmer.turepulseai.entity.ActionItem;
 import com.codmer.turepulseai.entity.Retro;
 import com.codmer.turepulseai.entity.User;
+import com.codmer.turepulseai.model.RetroActionItemsResponse;
 import com.codmer.turepulseai.repository.ActionItemRepository;
 import com.codmer.turepulseai.repository.RetroRepository;
 import com.codmer.turepulseai.repository.UserRepository;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -101,12 +103,58 @@ public class ActionItemServiceImpl implements ActionItemService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public RetroActionItemsResponse getActionItemsWithPastRetros(Long retroId) {
+        // Fetch the current retro to get the user who created it
+        Retro currentRetro = fetchRetro(retroId);
+        Long userId = currentRetro.getUser().getId();
+
+        // Get action items for the current retro
+        List<ActionItemDto> currentActionItems = actionItemRepository.findByRetroId(retroId).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+
+        // Get OPEN and IN_PROGRESS action items from past retros by the same user
+        List<ActionItem.ActionItemStatus> pendingStatuses = Arrays.asList(
+            ActionItem.ActionItemStatus.OPEN,
+            ActionItem.ActionItemStatus.IN_PROGRESS
+        );
+
+        // Fetch all retros created by the user to get their IDs
+        List<Retro> userRetros = fetchAllRetrosCreatedByUser(userId);
+        List<Long> allRetroIds = userRetros.stream()
+                .map(Retro::getId)
+                .filter(id -> !id.equals(retroId))
+                .toList();
+
+        if (allRetroIds.isEmpty()) {
+            return new RetroActionItemsResponse(currentActionItems, List.of());
+        }
+
+        List<ActionItemDto> pastActionItems = actionItemRepository
+                .findPastRetrosActionItemsByUserIdAndStatuses(allRetroIds, pendingStatuses)
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+
+        return new RetroActionItemsResponse(currentActionItems, pastActionItems);
+    }
+
     private Retro fetchRetro(Long id) {
         if (id == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "retroId is required");
         }
         return retroRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Retro not found"));
+    }
+
+    private List<Retro> fetchAllRetrosCreatedByUser(Long id) {
+        if (id == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userId is required");
+        }
+        List<Retro> retros = retroRepository.findByUserId(id);
+        return retros;
     }
 
     private User fetchUser(Long id) {
@@ -136,4 +184,3 @@ public class ActionItemServiceImpl implements ActionItemService {
         );
     }
 }
-
