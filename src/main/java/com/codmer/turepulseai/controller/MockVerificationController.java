@@ -4,10 +4,14 @@ import com.codmer.turepulseai.service.VerificationService;
 import com.codmer.turepulseai.service.VerificationSessionService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -236,55 +240,39 @@ public class MockVerificationController {
                    "<p>Session ID not found: " + sessionId + "</p>";
         }
 
-
-
-
         String countryCode = session != null ? session.getCountryCode() : preSignupSession.getCountryCode();
         String countryDisplay = getCountryDisplayName(countryCode);
         boolean isPreSignup = session == null;
 
-        // Return interactive HTML page
-        return "<!DOCTYPE html>" +
-               "<html>" +
-               "<head>" +
-               "  <title>ID Verification (Demo)</title>" +
-               "  <style>" +
-               "    body { font-family: Arial, sans-serif; text-align: center; padding: 40px; }" +
-               "    .card { max-width: 400px; margin: 0 auto; border: 2px solid #3b82f6; " +
-               "            border-radius: 10px; padding: 30px; background: #f0f9ff; }" +
-               "    h1 { color: #1e40af; }" +
-               "    p { color: #64748b; font-size: 14px; }" +
-               "    .badge { background: #dbeafe; color: #1e40af; padding: 8px 16px; " +
-               "             border-radius: 20px; display: inline-block; margin: 10px 0; font-size: 16px; }" +
-               "    button { background: linear-gradient(90deg, #22c55e 0%, #3b82f6 100%); " +
-               "             color: white; border: none; padding: 12px 24px; border-radius: 8px; " +
-               "             cursor: pointer; font-size: 16px; font-weight: bold; }" +
-               "    button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }" +
-               "  </style>" +
-               "</head>" +
-               "<body>" +
-               "  <div class='card'>" +
-               "    <h1>✓ ID Verification</h1>" +
-               "    <p>Demo Mode - No Real Verification</p>" +
-               "    <div class='badge'>" + countryDisplay + "</div>" +
-               "    <p style='margin-top: 20px;'>Ready to mark you as verified?</p>" +
-               "    <button onclick='verify()'>✓ Approve Verification</button>" +
-               "  </div>" +
-               "  <script>" +
-               "    function verify() {" +
-               "      const path = '" + (isPreSignup ? "/api/verification/pre-signup/approve/" : "/api/verification/approve/") + sessionId + "';" +
-               "      fetch(path, { method: 'POST' })" +
-               "        .then(r => r.json())" +
-               "        .then(data => {" +
-               "          document.body.innerHTML = '<h1 style=\"color: green;\">✓ Verified!</h1>' +" +
-               "                                   '<p>You can close this window.</p>';" +
-               "          setTimeout(() => window.close(), 2000);" +
-               "        })" +
-               "        .catch(e => alert('Error: ' + e.message));" +
-               "    }" +
-               "  </script>" +
-               "</body>" +
-               "</html>";
+        // Read and process the HTML template file
+        try {
+            String htmlTemplate = readHtmlTemplate();
+
+            // Replace placeholders with actual values
+            String apiPath = isPreSignup ? "/api/verification/pre-signup/approve/" : "/api/verification/approve/";
+
+            String processedHtml = htmlTemplate
+                .replace("{{COUNTRY_NAME}}", countryDisplay)
+                .replace("{{COUNTRY_CODE}}", countryCode)
+                .replace("{{SESSION_ID}}", sessionId)
+                .replace("{{IS_PRE_SIGNUP}}", String.valueOf(isPreSignup))
+                .replace("{{API_PATH}}", apiPath + sessionId);
+
+            return processedHtml;
+        } catch (Exception e) {
+            log.error("Error loading verification HTML template", e);
+            return "<html><body><h1>Error loading verification page</h1><p>" + e.getMessage() + "</p></body></html>";
+        }
+    }
+
+    /**
+     * Reads the HTML template file from resources
+     */
+    private String readHtmlTemplate() throws IOException {
+        ClassPathResource resource = new ClassPathResource("static/verification-signup.html");
+        try (InputStream inputStream = resource.getInputStream()) {
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     // --- ENDPOINT 5: Approve Verification (Called from mock page) ---

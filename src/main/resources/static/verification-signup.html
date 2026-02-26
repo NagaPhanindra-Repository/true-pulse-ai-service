@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Verification - TruePulse AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #718096;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .info-banner {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 30px 0;
+        }
+
+        .info-banner-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .info-icon {
+            font-size: 24px;
+            color: #667eea;
+        }
+
+        .info-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .info-content {
+            color: #4a5568;
+            font-size: 15px;
+            line-height: 1.8;
+            margin-left: 36px;
+        }
+
+        .feature-box {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .feature-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .check-icon {
+            color: #48bb78;
+            font-size: 20px;
+            margin-top: 2px;
+        }
+
+        .feature-text {
+            flex: 1;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+
+        .feature-desc {
+            color: #718096;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .upload-section {
+            margin: 30px 0;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .coming-soon-badge {
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .upload-button {
+            width: 100%;
+            padding: 16px 24px;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            background: #f7fafc;
+            color: #a0aec0;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: not-allowed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-button:hover::before {
+            left: 100%;
+        }
+
+        .upload-icon {
+            font-size: 20px;
+        }
+
+        .helper-text {
+            color: #a0aec0;
+            font-size: 13px;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+            margin: 30px 0;
+        }
+
+        .cta-section {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .continue-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .continue-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .continue-button:active {
+            transform: translateY(0);
+        }
+
+        .footer-note {
+            text-align: center;
+            color: #a0aec0;
+            font-size: 13px;
+            margin-top: 24px;
+            line-height: 1.6;
+        }
+
+        .roadmap-box {
+            background: linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #fbb6ce;
+        }
+
+        .roadmap-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #702459;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .roadmap-content {
+            color: #702459;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .continue-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🚀</div>
+            <h1>Welcome to TruePulse AI</h1>
+            <p class="subtitle">Building trust through verified identities</p>
+        </div>
+
+        <div class="info-banner">
+            <div class="info-banner-header">
+                <span class="info-icon">💡</span>
+                <span class="info-title">Early Access Notice</span>
+            </div>
+            <div class="info-content">
+                We're excited to have you join our community! As an <strong>early-stage startup</strong>, we're currently in our pre-launch phase. Our vision is to create a platform where every member is verified through secure identity validation—but we're not quite there yet.
+                <br><br>
+                For now, you can <span class="highlight">create your account without identity verification</span>. Your profile will be marked as "unverified" until we launch our full verification system. This allows you to explore the platform early while we build something amazing!
+            </div>
+        </div>
+
+        <div class="feature-box">
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <div class="feature-text">
+                    <div class="feature-title">Instant Account Access</div>
+                    <div class="feature-desc">Start exploring immediately—no waiting, no paperwork</div>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <div class="feature-text">
+                    <div class="feature-title">Early Adopter Advantage</div>
+                    <div class="feature-desc">Be among the first to shape our community and features</div>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <div class="feature-text">
+                    <div class="feature-title">Future Verification Ready</div>
+                    <div class="feature-desc">Easily upgrade to verified status when we launch ID verification</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="upload-section">
+            <div class="section-title">
+                Identity Verification
+                <span class="coming-soon-badge">Coming Soon</span>
+            </div>
+
+            <button class="upload-button" disabled>
+                <span class="upload-icon">📇</span>
+                <span>Upload Government ID</span>
+            </button>
+            <p class="helper-text">Identity document verification will be available in our next phase</p>
+
+            <button class="upload-button" disabled style="margin-top: 16px;">
+                <span class="upload-icon">🤳</span>
+                <span>Upload Selfie Photo</span>
+            </button>
+            <p class="helper-text">Live photo verification will launch alongside ID verification</p>
+        </div>
+
+        <div class="roadmap-box">
+            <div class="roadmap-title">
+                <span>🎯</span>
+                Our Commitment to You
+            </div>
+            <div class="roadmap-content">
+                Security and trust are at our core. Once we secure funding and partnerships with leading identity verification providers, we'll introduce <strong>government ID matching</strong> and <strong>biometric selfie verification</strong>. You'll be notified when this feature launches, with a simple one-time upgrade process.
+            </div>
+        </div>
+
+        <div class="cta-section">
+            <button class="continue-button" onclick="handleContinue()">
+                Continue to Sign Up
+            </button>
+            <p class="footer-note">
+                Your account will be created as <strong>"Unverified"</strong>
+                <br>
+                You can verify your identity later when the feature becomes available
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function handleContinue() {
+            // Dynamic API path injected by backend
+            const apiPath = '{{API_PATH}}';
+            const sessionId = '{{SESSION_ID}}';
+            const isPreSignup = {{IS_PRE_SIGNUP}};
+
+            console.log('Approving verification session:', sessionId);
+
+            fetch(apiPath, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Verification approved:', data);
+                    document.body.innerHTML = `
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <div style="background: white; padding: 60px; border-radius: 20px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                                <div style="font-size: 72px; margin-bottom: 20px;">✓</div>
+                                <h1 style="color: #22c55e; margin-bottom: 16px;">Success!</h1>
+                                <p style="color: #64748b; font-size: 18px;">Account created successfully</p>
+                                <p style="color: #a0aec0; font-size: 14px; margin-top: 20px;">You can close this window now</p>
+                            </div>
+                        </div>
+                    `;
+                    setTimeout(() => {
+                        window.close();
+                    }, 2500);
+                })
+                .catch(error => {
+                    console.error('Verification error:', error);
+                    alert('Error: ' + error.message);
+                });
+        }
+
+        // Add smooth scroll behavior
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Verification page loaded - Session: {{SESSION_ID}}');
+            console.log('Country: {{COUNTRY_NAME}} ({{COUNTRY_CODE}})');
+            console.log('Is Pre-Signup: {{IS_PRE_SIGNUP}}');
+        });
+    </script>
+</body>
+</html>
+
