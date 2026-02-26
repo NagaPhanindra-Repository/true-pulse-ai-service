@@ -2,8 +2,9 @@ package com.codmer.turepulseai.controller;
 
 import com.codmer.turepulseai.service.VerificationService;
 import com.codmer.turepulseai.service.VerificationSessionService;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,11 +32,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @RestController
 @RequestMapping("/api/verification")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class MockVerificationController {
 
     private final VerificationService verificationService;
     private final VerificationSessionService verificationSessionService;
+
+    @Value("${app.base-url}")
+    private String baseUrl;
 
     // In-memory store for demo (replace with database in production)
     private static final Map<String, VerificationSession> sessions = new ConcurrentHashMap<>();
@@ -111,7 +115,7 @@ public class MockVerificationController {
 
             // Return response that frontend expects
             Map<String, Object> response = new HashMap<>();
-            response.put("verificationUrl", "http://localhost:8080/api/verification/mock-page/" + sessionId);
+            response.put("verificationUrl", "test" + "/api/verification/mock-page/" + sessionId);
             response.put("sessionId", sessionId);
             response.put("status", "created");
 
@@ -233,14 +237,14 @@ public class MockVerificationController {
     public String showMockVerificationPage(@PathVariable String sessionId) {
 
         VerificationSession session = sessions.get(sessionId);
-        VerificationSessionService.VerificationSession preSignupSession = verificationSessionService.getSession(sessionId);
+        com.codmer.turepulseai.entity.VerificationSessionEntity dbSession = verificationSessionService.getSession(sessionId);
 
-        if (session == null && preSignupSession == null) {
+        if (session == null && dbSession == null) {
             return "<h1>❌ Invalid Session</h1>" +
                    "<p>Session ID not found: " + sessionId + "</p>";
         }
 
-        String countryCode = session != null ? session.getCountryCode() : preSignupSession.getCountryCode();
+        String countryCode = session != null ? session.getCountryCode() : dbSession.getCountryCode();
         String countryDisplay = getCountryDisplayName(countryCode);
         boolean isPreSignup = session == null;
 
@@ -382,14 +386,14 @@ public class MockVerificationController {
     @PostMapping("/pre-signup/create")
     public ResponseEntity<?> createPreSignupVerification(@RequestBody PreSignupVerificationRequest request) {
         try {
-            VerificationSessionService.VerificationSession session = verificationSessionService.createSession(
+            com.codmer.turepulseai.entity.VerificationSessionEntity session = verificationSessionService.createSession(
                     request.getUserName(),
                     request.getEmail(),
                     request.getCountryCode()
             );
 
             Map<String, Object> response = new HashMap<>();
-            response.put("verificationUrl", "http://localhost:8080/api/verification/mock-page/" + session.getSessionId());
+            response.put("verificationUrl", baseUrl+"/api/verification/mock-page/" + session.getSessionId());
             response.put("sessionId", session.getSessionId());
             response.put("status", "created");
 
@@ -419,7 +423,7 @@ public class MockVerificationController {
     @GetMapping("/pre-signup/status/{sessionId}")
     public ResponseEntity<?> getPreSignupStatus(@PathVariable String sessionId) {
         try {
-            VerificationSessionService.VerificationSession session = verificationSessionService.getSession(sessionId);
+            com.codmer.turepulseai.entity.VerificationSessionEntity session = verificationSessionService.getSession(sessionId);
             if (session == null) {
                 return ResponseEntity.status(404).body(
                         new ErrorResponse("Session not found", "Session ID: " + sessionId)
@@ -461,7 +465,7 @@ public class MockVerificationController {
     @PostMapping("/pre-signup/approve/{sessionId}")
     public ResponseEntity<?> approvePreSignup(@PathVariable String sessionId) {
         try {
-            VerificationSessionService.VerificationSession session = verificationSessionService.getSession(sessionId);
+            com.codmer.turepulseai.entity.VerificationSessionEntity session = verificationSessionService.getSession(sessionId);
             if (session == null) {
                 return ResponseEntity.status(404).body(
                         new ErrorResponse("Session not found", sessionId)

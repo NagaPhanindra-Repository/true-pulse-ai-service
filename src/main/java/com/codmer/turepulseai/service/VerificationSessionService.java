@@ -1,100 +1,193 @@
 package com.codmer.turepulseai.service;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.codmer.turepulseai.entity.VerificationSessionEntity;
+import com.codmer.turepulseai.entity.VerificationSessionEntity.VerificationStatus;
+import com.codmer.turepulseai.repository.VerificationSessionRepository;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 
 /**
- * In-memory verification session store for mock verification.
+ * VerificationSessionService
+ * Manages pre-signup verification sessions for users during registration flow.
+ * Uses database persistence instead of in-memory storage for production reliability.
  */
 @Slf4j
 @Service
+@AllArgsConstructor
 public class VerificationSessionService {
 
-    private final Map<String, VerificationSession> sessions = new ConcurrentHashMap<>();
-    private final Map<String, UserVerificationStatus> userVerifications = new ConcurrentHashMap<>();
+    private final VerificationSessionRepository verificationSessionRepository;
 
-    public VerificationSession createSession(String requestedUserName, String requestedEmail, String countryCode) {
+    /**
+     * Create a new verification session
+     */
+    public VerificationSessionEntity createSession(String userName, String email, String countryCode) {
         String sessionId = UUID.randomUUID().toString();
-        VerificationSession session = new VerificationSession();
-        session.setSessionId(sessionId);
-        session.setRequestedUserName(requestedUserName);
-        session.setRequestedEmail(requestedEmail);
-        session.setCountryCode(countryCode);
-        session.setCreatedAt(LocalDateTime.now());
-        session.setStatus("PENDING");
-        sessions.put(sessionId, session);
-        return session;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = now.plusHours(1); // Session expires in 1 hour
+
+        VerificationSessionEntity session = VerificationSessionEntity.builder()
+                .sessionId(sessionId)
+                .requestedUserName(userName)
+                .requestedEmail(email)
+                .countryCode(countryCode)
+                .status(VerificationStatus.PENDING)
+                .createdAt(now)
+                .consumed(false)
+                .expiresAt(expiresAt)
+                .build();
+
+        VerificationSessionEntity saved = verificationSessionRepository.save(session);
+        log.info("Created verification session {} for user {}", sessionId, userName);
+        return saved;
     }
 
-    public VerificationSession getSession(String sessionId) {
-        return sessions.get(sessionId);
+    /**
+     * Get session by sessionId
+     */
+    public VerificationSessionEntity getSession(String sessionId) {
+        Optional<VerificationSessionEntity> session = verificationSessionRepository.findBySessionId(sessionId);
+        if (session.isEmpty()) {
+            log.warn("Session not found: {}", sessionId);
+        }
+        return session.orElse(null);
     }
 
-    public boolean isSessionVerifiedForUser(String sessionId, String userName, String email) {
-        VerificationSession session = sessions.get(sessionId);
+    /**
+     * Check if session is approved/verified
+     */
+    public boolean isSessionApproved(String sessionId) {
+        VerificationSessionEntity session = getSession(sessionId);
         if (session == null) {
             return false;
         }
-        if (!"VERIFIED".equalsIgnoreCase(session.getStatus())) {
+        return VerificationStatus.VERIFIED.equals(session.getStatus()) && session.isValid();
+    }
+
+    /**
+     * Approve/verify a session
+     */
+    public VerificationSessionEntity approveSession(String sessionId) {
+        VerificationSessionEntity session = getSession(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("Session not found: " + sessionId);
+        }
+        session.setStatus(VerificationStatus.VERIFIED);
+        session.setVerifiedAt(LocalDateTime.now());
+        VerificationSessionEntity updated = verificationSessionRepository.save(session);
+        log.info("Approved verification session {} for user {}", sessionId, session.getRequestedUserName());
+        return updated;
+    }
+
+    /**
+     * Mark session as consumed (prevent reuse)
+     */
+    public VerificationSessionEntity consumeSession(String sessionId) {
+        VerificationSessionEntity session = getSession(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("Session not found: " + sessionId);
+        }
+        if (!VerificationStatus.VERIFIED.equals(session.getStatus())) {
+            throw new IllegalStateException("Session not verified yet: " + sessionId);
+        }
+        session.setConsumed(true);
+        VerificationSessionEntity updated = verificationSessionRepository.save(session);
+        log.info("Consumed verification session {} for user {}", sessionId, session.getRequestedUserName());
+        return updated;
+    }
+
+    /**
+     * Reject a session
+     */
+    public VerificationSessionEntity rejectSession(String sessionId, String reason) {
+        VerificationSessionEntity session = getSession(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("Session not found: " + sessionId);
+        }
+        session.setStatus(VerificationStatus.REJECTED);
+        VerificationSessionEntity updated = verificationSessionRepository.save(session);
+        log.warn("Rejected verification session {} for user {} - Reason: {}",
+                sessionId, session.getRequestedUserName(), reason);
+        return updated;
+    }
+
+    /**
+     * Delete session from database
+     */
+    public void deleteSession(String sessionId) {
+        VerificationSessionEntity session = getSession(sessionId);
+        if (session != null) {
+            verificationSessionRepository.delete(session);
+            log.info("Deleted verification session {}", sessionId);
+        }
+    }
+
+    /**
+     * Clean up expired sessions - can be called periodically
+     */
+    public void cleanupExpiredSessions() {
+        verificationSessionRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+        log.info("Cleaned up expired verification sessions");
+    }
+
+    /**
+     * CRITICAL: Verify session is valid for signup
+     * Checks: session exists, is verified, user details match, not consumed, not expired
+     */
+    public boolean isSessionVerifiedForUser(String sessionId, String userName, String email) {
+        VerificationSessionEntity session = getSession(sessionId);
+        if (session == null) {
+            log.warn("Session not found for verification: {}", sessionId);
             return false;
         }
+
+        // Check if session is verified
+        if (!VerificationStatus.VERIFIED.equals(session.getStatus())) {
+            log.warn("Session {} is not verified yet. Status: {}", sessionId, session.getStatus());
+            return false;
+        }
+
+        // Check if session matches the requested username
+        if (!session.getRequestedUserName().equalsIgnoreCase(userName)) {
+            log.warn("Session {} username mismatch. Expected: {}, Got: {}",
+                    sessionId, session.getRequestedUserName(), userName);
+            return false;
+        }
+
+        // Check if session matches the requested email
+        if (!session.getRequestedEmail().equalsIgnoreCase(email)) {
+            log.warn("Session {} email mismatch. Expected: {}, Got: {}",
+                    sessionId, session.getRequestedEmail(), email);
+            return false;
+        }
+
+        // Check if session has already been consumed
         if (session.isConsumed()) {
+            log.warn("Session {} has already been consumed", sessionId);
             return false;
         }
-        if (session.getRequestedUserName() != null && userName != null
-                && !session.getRequestedUserName().equalsIgnoreCase(userName)) {
+
+        // Check if session is still valid (not expired)
+        if (!session.isValid()) {
+            log.warn("Session {} has expired", sessionId);
             return false;
         }
-        if (session.getRequestedEmail() != null && email != null
-                && !session.getRequestedEmail().equalsIgnoreCase(email)) {
-            return false;
-        }
+
+        log.info("Session {} verified for user {}", sessionId, userName);
         return true;
     }
 
-    public void approveSession(String sessionId) {
-        VerificationSession session = sessions.get(sessionId);
-        if (session == null) {
-            return;
-        }
-        session.setStatus("VERIFIED");
-        session.setVerifiedAt(LocalDateTime.now());
-    }
-
-    public void consumeSession(String sessionId) {
-        VerificationSession session = sessions.get(sessionId);
-        if (session != null) {
-            session.setConsumed(true);
-        }
-    }
-
-    public UserVerificationStatus getUserStatus(String userName) {
-        return userVerifications.get(userName);
-    }
-
-    public void setUserVerified(String userName, String countryCode) {
-        if (userName == null) {
-            return;
-        }
-        UserVerificationStatus status = new UserVerificationStatus();
-        status.setUserName(userName);
-        status.setVerified(true);
-        status.setCountryCode(countryCode);
-        status.setVerifiedAt(LocalDateTime.now());
-        userVerifications.put(userName, status);
-    }
-
-    public void resetUserVerification(String userName) {
-        if (userName != null) {
-            userVerifications.remove(userName);
-        }
-    }
-
+    /**
+     * VerificationSession DTO - no longer used internally, kept for backwards compatibility
+     */
+    @Data
+    @AllArgsConstructor
     public static class VerificationSession {
         private String sessionId;
         private String requestedUserName;
@@ -104,49 +197,34 @@ public class VerificationSessionService {
         private LocalDateTime createdAt;
         private LocalDateTime verifiedAt;
         private boolean consumed;
+        private String rejectionReason;
 
-        public String getSessionId() { return sessionId; }
-        public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+        public VerificationSession() {
+            this.consumed = false;
+        }
 
-        public String getRequestedUserName() { return requestedUserName; }
-        public void setRequestedUserName(String requestedUserName) { this.requestedUserName = requestedUserName; }
+        public boolean isValid() {
+            if (createdAt == null) {
+                return false;
+            }
+            LocalDateTime expiresAt = createdAt.plusHours(1);
+            return LocalDateTime.now().isBefore(expiresAt);
+        }
 
-        public String getRequestedEmail() { return requestedEmail; }
-        public void setRequestedEmail(String requestedEmail) { this.requestedEmail = requestedEmail; }
+        public boolean isReadyForSignup() {
+            return "VERIFIED".equals(status) && !consumed && isValid();
+        }
 
-        public String getCountryCode() { return countryCode; }
-        public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
-
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
-
-        public LocalDateTime getCreatedAt() { return createdAt; }
-        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
-        public LocalDateTime getVerifiedAt() { return verifiedAt; }
-        public void setVerifiedAt(LocalDateTime verifiedAt) { this.verifiedAt = verifiedAt; }
-
-        public boolean isConsumed() { return consumed; }
-        public void setConsumed(boolean consumed) { this.consumed = consumed; }
-    }
-
-    public static class UserVerificationStatus {
-        private String userName;
-        private boolean verified;
-        private String countryCode;
-        private LocalDateTime verifiedAt;
-
-        public String getUserName() { return userName; }
-        public void setUserName(String userName) { this.userName = userName; }
-
-        public boolean isVerified() { return verified; }
-        public void setVerified(boolean verified) { this.verified = verified; }
-
-        public String getCountryCode() { return countryCode; }
-        public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
-
-        public LocalDateTime getVerifiedAt() { return verifiedAt; }
-        public void setVerifiedAt(LocalDateTime verifiedAt) { this.verifiedAt = verifiedAt; }
+        @Override
+        public String toString() {
+            return "VerificationSession{" +
+                    "sessionId='" + sessionId + '\'' +
+                    ", requestedUserName='" + requestedUserName + '\'' +
+                    ", requestedEmail='" + requestedEmail + '\'' +
+                    ", countryCode='" + countryCode + '\'' +
+                    ", status='" + status + '\'' +
+                    ", consumed=" + consumed +
+                    '}';
+        }
     }
 }
-
