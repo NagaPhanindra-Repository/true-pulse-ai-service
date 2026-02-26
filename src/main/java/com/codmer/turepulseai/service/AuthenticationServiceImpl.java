@@ -27,18 +27,24 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
     private RoleRepository roleRepository;
+    private VerificationSessionService verificationSessionService;
+    private VerificationService verificationService;
 
 
     public AuthenticationServiceImpl(
             JwtTokenProvider jwtTokenProvider,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            AuthenticationManager authenticationManager, RoleRepository roleRepository) {
+            AuthenticationManager authenticationManager, RoleRepository roleRepository,
+            VerificationSessionService verificationSessionService,
+            VerificationService verificationService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.roleRepository = roleRepository;
+        this.verificationSessionService = verificationSessionService;
+        this.verificationService = verificationService;
     }
 
     @Override
@@ -56,6 +62,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public User createUser(CreateUserDto createUserDto) {
+        if (createUserDto.getVerificationSessionId() == null || createUserDto.getVerificationSessionId().isBlank()) {
+            throw new IllegalArgumentException("Verification is required before signup.");
+        }
+
+        boolean verified = verificationSessionService.isSessionVerifiedForUser(
+                createUserDto.getVerificationSessionId(),
+                createUserDto.getUserName(),
+                createUserDto.getEmail()
+        );
+        if (!verified) {
+            throw new IllegalArgumentException("Verification not completed. Please verify your identity.");
+        }
+
         User user = new User();
         user.setUserName(createUserDto.getUserName());
         user.setCountryCode(createUserDto.getCountryCode());
@@ -66,6 +85,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setMobileNumber(createUserDto.getMobileNumber());
         // default userType to MEMBER (CreateUserDto doesn't include userType yet)
         user.setUserType(UserType.MEMBER);
+        user.setVerified(true);
 
         try {
             user.setGender(Gender.valueOf(createUserDto.getGender()));
@@ -77,6 +97,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .orElseThrow(() -> new IllegalArgumentException("Role not found: " + createUserDto.getRoleName()));
         roles.add(role);
         user.setRoles(roles);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        verificationSessionService.consumeSession(createUserDto.getVerificationSessionId());
+        verificationService.markUserAsVerified(saved.getUserName());
+        return saved;
     }
 }

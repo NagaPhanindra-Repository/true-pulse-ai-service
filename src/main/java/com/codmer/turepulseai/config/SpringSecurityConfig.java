@@ -75,7 +75,10 @@ public class SpringSecurityConfig {
                                 "/swagger-ui.html",
                                 "/api/entities/public/**",
                                 "/api/retros/public/**",
-                                "/api/business-documents/public/**").permitAll()
+                                "/api/business-documents/public/**",
+                                "/api/verification/mock-page/**",
+                                "/api/verification/approve/**",
+                                "/api/verification/pre-signup/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         .anyRequest().authenticated()
                 );

@@ -2,6 +2,7 @@ package com.codmer.turepulseai.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -57,23 +58,28 @@ public class User {
 
     private LocalDateTime updatedAt;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Retro> retros = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Question> questions = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Answer> answers = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Discussion> discussions = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "assignedUser", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<ActionItem> assignedActionItems = new ArrayList<>();
 
-
     // Roles are optional for a User. A user may have zero or more roles.
+    @JsonIgnore
     @ManyToMany(targetEntity = Role.class, fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",

@@ -2,6 +2,7 @@ package com.codmer.turepulseai.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.Set;
 import java.util.HashSet;
@@ -10,6 +11,8 @@ import java.util.HashSet;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(exclude = {"users"})
+@ToString(exclude = {"users"})
 @Entity
 @Table(name = "roles", indexes = {@Index(name = "idx_role_name", columnList = "name")})
 public class Role {
@@ -23,6 +26,7 @@ public class Role {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @JsonIgnore
     @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
     private Set<User> users = new HashSet<>();
 }

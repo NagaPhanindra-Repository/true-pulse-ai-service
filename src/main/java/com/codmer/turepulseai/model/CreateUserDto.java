@@ -19,4 +19,5 @@ public class CreateUserDto {
     private String lastName;
     private String roleName;
     private String gender;
+    private String verificationSessionId;
 }
