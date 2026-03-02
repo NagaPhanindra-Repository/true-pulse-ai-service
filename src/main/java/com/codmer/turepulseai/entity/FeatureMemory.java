@@ -53,6 +53,27 @@ public class FeatureMemory {
     @Column(length = 100)
     private String jiraStatus;
 
+    @Column(length = 255)
+    private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(length = 500)
+    private String jiraStoryUrl;
+
+    @Column(length = 255)
+    private String project;
+
+    @Column(length = 255)
+    private String assignee;
+
+    @Column(length = 255)
+    private String linkedBranch;
+
+    @Column(length = 255)
+    private String branchName;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String initialDescription;
 

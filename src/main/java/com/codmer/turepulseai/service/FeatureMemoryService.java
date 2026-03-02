@@ -49,22 +49,36 @@ public class FeatureMemoryService {
 
         JiraIntegration integration = null;
         if (request.getJiraIntegrationId() != null) {
-            integration = jiraIntegrationRepository.findByIdAndUser(request.getJiraIntegrationId(), user)
-                .orElseThrow(() -> new IllegalArgumentException("Jira integration not found"));
+            try {
+                UUID integrationId = request.getJiraIntegrationId();
+                integration = jiraIntegrationRepository.findByIdAndUser(integrationId, user)
+                    .orElseThrow(() -> new IllegalArgumentException("Jira integration not found"));
+            } catch (IllegalArgumentException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid Jira integration ID format", e);
+            }
         }
 
         FeatureMemory memory = FeatureMemory.builder()
             .user(user)
             .jiraIntegration(integration)
+            .title(request.getTitle())
+            .description(request.getDescription())
             .jiraStoryKey(request.getJiraStoryKey())
+            .jiraStoryUrl(request.getJiraStoryUrl())
+            .project(request.getProject())
+            .assignee(request.getAssignee())
+            .linkedBranch(request.getLinkedBranch())
+            .branchName(request.getBranchName())
             .jiraStoryId(jiraStory != null ? jiraStory.getId() : null)
             .jiraStoryTitle(jiraStory != null ? jiraStory.getSummary() : null)
             .jiraStoryDescription(jiraStory != null ? jiraStory.getDescription() : null)
             .jiraStoryType(jiraStory != null ? jiraStory.getIssueType() : null)
             .jiraAssignee(jiraStory != null ? jiraStory.getAssignee() : null)
             .jiraStatus(jiraStory != null ? jiraStory.getStatus() : null)
-            .initialDescription(request.getInitialDescription())
-            .status("active")
+            .initialDescription(request.getDescription() != null ? request.getDescription() : "")
+            .status(request.getStatus() != null ? request.getStatus() : "active")
             .build();
 
         FeatureMemory saved = memoryRepository.save(memory);
@@ -296,9 +310,17 @@ public class FeatureMemoryService {
 
         return FeatureMemoryDto.builder()
             .id(memory.getId())
+            .userId(memory.getUser().getId())
+            .title(memory.getTitle())
+            .description(memory.getDescription())
             .jiraStoryKey(memory.getJiraStoryKey())
+            .jiraStoryUrl(memory.getJiraStoryUrl())
             .jiraStoryTitle(memory.getJiraStoryTitle())
             .jiraStoryDescription(memory.getJiraStoryDescription())
+            .project(memory.getProject())
+            .assignee(memory.getAssignee())
+            .linkedBranch(memory.getLinkedBranch())
+            .branchName(memory.getBranchName())
             .status(memory.getStatus())
             .discussionCount(discussionCount)
             .createdAt(memory.getCreatedAt())
