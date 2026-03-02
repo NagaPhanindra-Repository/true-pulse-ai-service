@@ -98,6 +98,21 @@ public class JiraIntegrationController {
 
     /**
      * Create a new Jira integration
+     *
+     * RECOMMENDED WORKFLOW:
+     * 1. First call POST /api/jira/integrations/test-connection with credentials to verify connection
+     * 2. Test-connection returns ConnectionTestResult with availableProjects list
+     * 3. Extract projectKeys from availableProjects (map project.key to string array)
+     * 4. Call this endpoint with projectKeys populated from test-connection response
+     *
+     * @param request JiraIntegrationRequest with:
+     *                - name (optional): Custom name for this integration
+     *                - jiraUrl (required): Jira instance URL
+     *                - jiraEmail (required): Email for authentication
+     *                - apiToken (required): API token
+     *                - projectKeys (optional): List of project keys from test-connection response
+     *                - projects (optional): List of JiraProject objects from test-connection response
+     * @return JiraIntegrationDto with created integration details
      */
     @PostMapping("/integrations")
     public ResponseEntity<JiraIntegrationDto> createIntegration(@RequestBody JiraIntegrationRequest request) {
@@ -237,13 +252,17 @@ public class JiraIntegrationController {
 
     private JiraIntegrationDto convertToDto(JiraIntegration integration) {
         return JiraIntegrationDto.builder()
-            .id(integration.getId())
+            .id(integration.getId().toString())
+            .userId(integration.getUser().getId().toString())
+            .name(integration.getName())
             .jiraUrl(integration.getJiraUrl())
+            .baseUrl(integration.getBaseUrl())
             .jiraEmail(integration.getJiraEmail())
             .projectKeys(integration.getProjectKeys())
             .isActive(integration.getIsActive())
             .lastSyncAt(integration.getLastSyncAt())
             .createdAt(integration.getCreatedAt())
+            .updatedAt(integration.getUpdatedAt())
             .build();
     }
 }

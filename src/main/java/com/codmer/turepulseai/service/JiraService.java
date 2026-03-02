@@ -11,6 +11,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -98,6 +100,10 @@ public class JiraService {
 
             JsonNode rootNode = objectMapper.readTree(response);
 
+            // Parse dates with proper timezone handling
+            LocalDateTime created = parseJiraDateTime(rootNode.path("fields").path("created").asText());
+            LocalDateTime updated = parseJiraDateTime(rootNode.path("fields").path("updated").asText());
+
             return JiraStoryDto.builder()
                 .id(rootNode.get("id").asText())
                 .key(rootNode.get("key").asText())
@@ -107,13 +113,33 @@ public class JiraService {
                 .issueType(rootNode.path("fields").path("issuetype").path("name").asText())
                 .status(rootNode.path("fields").path("status").path("name").asText())
                 .assignee(rootNode.path("fields").path("assignee").path("displayName").asText(""))
-                .created(rootNode.path("fields").path("created").asText())
-                .updated(rootNode.path("fields").path("updated").asText())
+                .created(created)
+                .updated(updated)
                 .build();
 
         } catch (Exception e) {
             log.error("Failed to fetch story details from Jira", e);
             return null;
+        }
+    }
+
+    /**
+     * Parse Jira datetime string with timezone offset
+     * Jira returns format: 2026-03-01T20:22:06.366-0600 (without colon in timezone)
+     * ZonedDateTime expects: 2026-03-01T20:22:06.366-06:00 (with colon in timezone)
+     */
+    private LocalDateTime parseJiraDateTime(String dateTimeString) {
+        try {
+            // Normalize timezone format: -0600 → -06:00
+            String normalized = dateTimeString.replaceAll("([+-]\\d{2})(\\d{2})$", "$1:$2");
+            log.debug("Parsing Jira datetime. Original: {}, Normalized: {}", dateTimeString, normalized);
+
+            ZonedDateTime zonedDateTime = ZonedDateTime.parse(normalized);
+            return zonedDateTime.toLocalDateTime();
+        } catch (Exception e) {
+            log.error("Failed to parse Jira datetime: {}", dateTimeString, e);
+            // Return current time as fallback
+            return LocalDateTime.now();
         }
     }
 

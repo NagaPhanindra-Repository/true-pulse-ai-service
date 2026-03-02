@@ -27,8 +27,14 @@ public class JiraIntegration {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(length = 255)
+    private String name;
+
     @Column(nullable = false, length = 500)
     private String jiraUrl;
+
+    @Column(length = 500)
+    private String baseUrl;
 
     @Column(nullable = false, length = 255)
     private String jiraEmail;
@@ -36,8 +42,13 @@ public class JiraIntegration {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String encryptedApiToken;
 
-    @Column(columnDefinition = "TEXT[]")
-    private String[] projectKeys;
+    @ElementCollection
+    @CollectionTable(name = "jira_integration_project_keys", joinColumns = @JoinColumn(name = "jira_integration_id"))
+    @Column(name = "project_key")
+    private List<String> projectKeys = new ArrayList<>();
+
+    @OneToMany(mappedBy = "jiraIntegration", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<JiraProject> projects = new ArrayList<>();
 
     @Column(nullable = false)
     private Boolean isActive;
@@ -58,6 +69,9 @@ public class JiraIntegration {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (isActive == null) {
+            isActive = true;
+        }
     }
 
     @PreUpdate
@@ -65,4 +79,8 @@ public class JiraIntegration {
         updatedAt = LocalDateTime.now();
     }
 }
+
+
+
+
 

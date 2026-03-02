@@ -1,12 +1,14 @@
 package com.codmer.turepulseai.service;
 
 import com.codmer.turepulseai.entity.JiraIntegration;
+import com.codmer.turepulseai.entity.JiraProject;
 import com.codmer.turepulseai.entity.User;
 import com.codmer.turepulseai.model.ConnectionTestResult;
 import com.codmer.turepulseai.model.JiraIntegrationDto;
 import com.codmer.turepulseai.model.JiraIntegrationRequest;
 import com.codmer.turepulseai.model.JiraStoryDto;
 import com.codmer.turepulseai.repository.JiraIntegrationRepository;
+import com.codmer.turepulseai.repository.JiraProjectRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,14 +23,17 @@ import java.util.stream.Collectors;
 public class JiraIntegrationService {
 
     private final JiraIntegrationRepository jiraIntegrationRepository;
+    private final JiraProjectRepository jiraProjectRepository;
     private final JiraService jiraService;
     private final EncryptionService encryptionService;
 
     public JiraIntegrationService(
         JiraIntegrationRepository jiraIntegrationRepository,
+        JiraProjectRepository jiraProjectRepository,
         JiraService jiraService,
         EncryptionService encryptionService) {
         this.jiraIntegrationRepository = jiraIntegrationRepository;
+        this.jiraProjectRepository = jiraProjectRepository;
         this.jiraService = jiraService;
         this.encryptionService = encryptionService;
     }
@@ -50,15 +55,88 @@ public class JiraIntegrationService {
             throw new RuntimeException("Failed to encrypt credentials", e);
         }
 
+        // Extract base URL (without query parameters)
+        String baseUrl = normalizeBaseUrl(request.getJiraUrl());
+
         JiraIntegration integration = JiraIntegration.builder()
             .user(user)
+            .name(request.getName())
             .jiraUrl(request.getJiraUrl())
+            .baseUrl(baseUrl)
             .jiraEmail(request.getJiraEmail())
             .encryptedApiToken(encryptedToken)
             .isActive(true)
             .build();
 
-        return jiraIntegrationRepository.save(integration);
+        log.info("Creating Jira integration for user: {} with Jira URL: {}", user.getId(), request.getJiraUrl());
+
+        // Save integration first
+        JiraIntegration savedIntegration = jiraIntegrationRepository.save(integration);
+
+        // Before saving projects, get the actual projects from Jira using test-connection
+        log.info("Testing connection to get actual projects from Jira");
+        ConnectionTestResult testResult = jiraService.testConnection(
+            request.getJiraUrl(),
+            request.getJiraEmail(),
+            request.getApiToken()
+        );
+
+        if (!testResult.getSuccess()) {
+            log.warn("Connection test failed when creating integration: {}", testResult.getError());
+            // Delete the integration we just created since connection failed
+            jiraIntegrationRepository.delete(savedIntegration);
+            throw new RuntimeException("Failed to verify connection with Jira: " + testResult.getError());
+        }
+
+        // Use actual projects from Jira test-connection response
+        List<com.codmer.turepulseai.model.JiraProject> jiraProjects = testResult.getAvailableProjects();
+
+        // Extract projectKeys from Jira response
+        List<String> projectKeys = jiraProjects.stream()
+            .map(project -> project.getKey())
+            .collect(Collectors.toList());
+
+        // Save projectKeys to integration
+        savedIntegration.setProjectKeys(projectKeys);
+        log.info("Found {} projects from Jira: {}", projectKeys.size(), projectKeys);
+
+        // Save individual project details from Jira response
+        if (jiraProjects != null && !jiraProjects.isEmpty()) {
+            List<JiraProject> projectEntities = jiraProjects.stream()
+                .map(project -> JiraProject.builder()
+                    .jiraIntegration(savedIntegration)
+                    .projectKey(project.getKey())
+                    .projectName(project.getName())
+                    .projectTypeKey(project.getProjectTypeKey())
+                    .build())
+                .collect(Collectors.toList());
+
+            List<JiraProject> savedProjects = jiraProjectRepository.saveAll(projectEntities);
+            savedIntegration.setProjects(savedProjects);
+            log.info("Saved {} project details for integration: {}", savedProjects.size(), savedIntegration.getId());
+        }
+
+        // Save updated integration with projectKeys and projects
+        return jiraIntegrationRepository.save(savedIntegration);
+    }
+
+    /**
+     * Normalize base URL - extract just the domain
+     */
+    private String normalizeBaseUrl(String jiraUrl) {
+        String url = jiraUrl.trim();
+        // Remove query parameters and fragments
+        if (url.contains("?")) {
+            url = url.substring(0, url.indexOf("?"));
+        }
+        if (url.contains("#")) {
+            url = url.substring(0, url.indexOf("#"));
+        }
+        // Remove trailing slash
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
     }
 
     /**
@@ -188,14 +266,28 @@ public class JiraIntegrationService {
      * Convert to DTO (excludes encrypted token)
      */
     private JiraIntegrationDto convertToDto(JiraIntegration integration) {
+        // Convert project entities to DTOs using model DTO class
+        List<com.codmer.turepulseai.model.JiraProject> projectDtos = integration.getProjects().stream()
+            .map(projectEntity -> com.codmer.turepulseai.model.JiraProject.builder()
+                .key(projectEntity.getProjectKey())
+                .name(projectEntity.getProjectName())
+                .projectTypeKey(projectEntity.getProjectTypeKey())
+                .build())
+            .collect(Collectors.toList());
+
         return JiraIntegrationDto.builder()
-            .id(integration.getId())
+            .id(integration.getId().toString())
+            .userId(integration.getUser().getId().toString())
+            .name(integration.getName())
             .jiraUrl(integration.getJiraUrl())
+            .baseUrl(integration.getBaseUrl())
             .jiraEmail(integration.getJiraEmail())
             .projectKeys(integration.getProjectKeys())
+            .projects(projectDtos)
             .isActive(integration.getIsActive())
             .lastSyncAt(integration.getLastSyncAt())
             .createdAt(integration.getCreatedAt())
+            .updatedAt(integration.getUpdatedAt())
             .build();
     }
 }
