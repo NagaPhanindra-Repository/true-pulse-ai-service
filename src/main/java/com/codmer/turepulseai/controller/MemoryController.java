@@ -41,6 +41,7 @@ public class MemoryController {
 
     /**
      * Create a new feature memory
+     * Fetches Jira story details and uses them to populate the memory
      */
     @PostMapping
     public ResponseEntity<FeatureMemoryDto> createMemory(@RequestBody CreateMemoryRequest request) {
@@ -49,14 +50,35 @@ public class MemoryController {
 
             JiraStoryDto jiraStory = null;
             if (request.getJiraIntegrationId() != null) {
-                jiraStory = jiraIntegrationService.fetchStory(
-                    request.getJiraIntegrationId(),
-                    user,
-                    request.getJiraStoryKey()
-                );
+                try {
+                    log.info("Fetching Jira story: {} from integration: {}", request.getJiraStoryKey(), request.getJiraIntegrationId());
+                    jiraStory = jiraIntegrationService.fetchStory(
+                        request.getJiraIntegrationId(),
+                        user,
+                        request.getJiraStoryKey()
+                    );
+
+                    if (jiraStory != null) {
+                        log.info("✓ Fetched Jira story successfully");
+                        log.info("  - Title: {}", jiraStory.getSummary());
+                        log.info("  - Description: {}", jiraStory.getDescription());
+                        log.info("  - Type: {}", jiraStory.getIssueType());
+                        log.info("  - Status: {}", jiraStory.getStatus());
+                        log.info("  - Assignee: {}", jiraStory.getAssignee());
+                        log.info("  - Project: {}", jiraStory.getProject());
+                        log.info("  - URL: {}", jiraStory.getUrl());
+                    } else {
+                        log.warn("Jira story returned null for: {}", request.getJiraStoryKey());
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to fetch Jira story: {}", e.getMessage());
+                }
+            } else {
+                log.warn("No Jira integration provided, creating memory without Jira details");
             }
 
             FeatureMemory memory = memoryService.createMemory(request, user, jiraStory);
+            log.info("✓ Created feature memory with ID: {}", memory.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(convertToDto(memory));
         } catch (Exception e) {
             log.error("Error creating feature memory", e);
@@ -219,12 +241,22 @@ public class MemoryController {
     private FeatureMemoryDto convertToDto(FeatureMemory memory) {
         return FeatureMemoryDto.builder()
             .id(memory.getId())
+            .userId(memory.getUser().getId())
+            .jiraIntegrationId(memory.getJiraIntegration() != null ? memory.getJiraIntegration().getId() : null)
             .jiraStoryKey(memory.getJiraStoryKey())
             .jiraStoryTitle(memory.getJiraStoryTitle())
             .jiraStoryDescription(memory.getJiraStoryDescription())
+            .jiraStoryType(memory.getJiraStoryType())
+            .jiraAssignee(memory.getJiraAssignee())
+            .jiraStatus(memory.getJiraStatus())
+            .project(memory.getProject())
+            .url(memory.getUrl())
+            .labels(memory.getLabels())
+            .initialDescription(memory.getInitialDescription())
             .status(memory.getStatus())
             .createdAt(memory.getCreatedAt())
             .updatedAt(memory.getUpdatedAt())
+            .completedAt(memory.getCompletedAt())
             .build();
     }
 

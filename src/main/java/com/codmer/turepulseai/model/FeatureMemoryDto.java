@@ -2,6 +2,7 @@ package com.codmer.turepulseai.model;
 
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -11,19 +12,21 @@ import java.util.UUID;
 public class FeatureMemoryDto {
     private UUID id;
     private Long userId;
-    private String title;
-    private String description;
+    private UUID jiraIntegrationId;
     private String jiraStoryKey;
-    private String jiraStoryUrl;
     private String jiraStoryTitle;
     private String jiraStoryDescription;
+    private String jiraStoryType;
+    private String jiraAssignee;
+    private String jiraStatus;
     private String project;
-    private String assignee;
-    private String linkedBranch;
-    private String branchName;
+    private String url;
+    private List<String> labels;
+    private String initialDescription;
     private String status;
-    private Long discussionCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime completedAt;
+    private Long discussionCount;
 }
 

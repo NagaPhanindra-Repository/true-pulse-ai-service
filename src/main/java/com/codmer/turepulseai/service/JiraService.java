@@ -99,27 +99,104 @@ public class JiraService {
             String response = makeJiraRequest(baseUrl, "/rest/api/3/issue/" + storyKey, jiraEmail, apiToken, "GET");
 
             JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode fieldsNode = rootNode.path("fields");
 
             // Parse dates with proper timezone handling
             LocalDateTime created = parseJiraDateTime(rootNode.path("fields").path("created").asText());
             LocalDateTime updated = parseJiraDateTime(rootNode.path("fields").path("updated").asText());
 
+            // Extract description from rich text format
+            String description = extractDescriptionFromRichText(fieldsNode.path("description"));
+
+            // Extract assignee displayName
+            String assignee = fieldsNode.path("assignee").path("displayName").asText("");
+
+            // Extract project name
+            String project = fieldsNode.path("project").path("name").asText("");
+
+            // Extract labels as list
+            List<String> labelsList = new ArrayList<>();
+            if (fieldsNode.path("labels").isArray() && fieldsNode.path("labels").size() > 0) {
+                fieldsNode.path("labels").forEach(label -> {
+                    labelsList.add(label.asText());
+                });
+            }
+
+            // Build Jira story URL
+            String storyUrl = baseUrl + "/browse/" + rootNode.get("key").asText();
+
+            log.info("✓ Successfully parsed Jira story: {}", storyKey);
+            log.info("  - Title: {}", fieldsNode.path("summary").asText());
+            log.info("  - Description: {}", (description.isEmpty() ? "No description" : description.substring(0, Math.min(50, description.length())) + "..."));
+            log.info("  - Assignee: {}", (assignee.isEmpty() ? "Not assigned" : assignee));
+            log.info("  - Project: {}", project);
+            log.info("  - Status: {}", fieldsNode.path("status").path("name").asText());
+
             return JiraStoryDto.builder()
                 .id(rootNode.get("id").asText())
                 .key(rootNode.get("key").asText())
-                .summary(rootNode.path("fields").path("summary").asText())
-                .description(rootNode.path("fields").path("description").path("content").elements().hasNext() ?
-                    rootNode.path("fields").path("description").path("content").get(0).path("content").get(0).asText() : "")
-                .issueType(rootNode.path("fields").path("issuetype").path("name").asText())
-                .status(rootNode.path("fields").path("status").path("name").asText())
-                .assignee(rootNode.path("fields").path("assignee").path("displayName").asText(""))
+                .summary(fieldsNode.path("summary").asText())
+                .description(description)
+                .issueType(fieldsNode.path("issuetype").path("name").asText())
+                .type(fieldsNode.path("issuetype").path("name").asText())
+                .status(fieldsNode.path("status").path("name").asText())
+                .project(project)
+                .assignee(assignee)
+                .url(storyUrl)
+                .labels(labelsList.isEmpty() ? null : labelsList)
                 .created(created)
                 .updated(updated)
                 .build();
 
         } catch (Exception e) {
-            log.error("Failed to fetch story details from Jira", e);
+            log.error("Failed to fetch story details from Jira for key: {}", storyKey, e);
             return null;
+        }
+    }
+
+    /**
+     * Extract plain text description from Jira rich text format
+     * Jira uses ADF (Atlassian Document Format) with structure like:
+     * {
+     *   "type": "doc",
+     *   "content": [
+     *     {"type": "paragraph", "content": [{"type": "text", "text": "..."}]}
+     *   ]
+     * }
+     */
+    private String extractDescriptionFromRichText(JsonNode descriptionNode) {
+        try {
+            if (descriptionNode == null || descriptionNode.isNull() || !descriptionNode.hasNonNull("content")) {
+                return "";
+            }
+
+            StringBuilder fullText = new StringBuilder();
+
+            // Navigate through the ADF structure
+            JsonNode contentArray = descriptionNode.path("content");
+            if (contentArray.isArray()) {
+                contentArray.forEach(paragraph -> {
+                    // Get text from each paragraph
+                    JsonNode paragraphContent = paragraph.path("content");
+                    if (paragraphContent.isArray()) {
+                        paragraphContent.forEach(textNode -> {
+                            String text = textNode.path("text").asText();
+                            if (!text.isEmpty()) {
+                                if (!fullText.isEmpty()) {
+                                    fullText.append("\n");
+                                }
+                                fullText.append(text);
+                            }
+                        });
+                    }
+                });
+            }
+
+            log.debug("Extracted description: {}", fullText);
+            return fullText.toString();
+        } catch (Exception e) {
+            log.warn("Failed to extract description from rich text: {}", e.getMessage());
+            return "";
         }
     }
 

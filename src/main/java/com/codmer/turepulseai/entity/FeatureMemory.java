@@ -65,6 +65,14 @@ public class FeatureMemory {
     @Column(length = 255)
     private String project;
 
+    @Column(length = 500)
+    private String url;
+
+    @ElementCollection
+    @CollectionTable(name = "feature_memory_labels", joinColumns = @JoinColumn(name = "feature_memory_id"))
+    @Column(name = "label")
+    private List<String> labels;
+
     @Column(length = 255)
     private String assignee;
 
