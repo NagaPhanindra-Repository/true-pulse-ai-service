@@ -1,0 +1,516 @@
+{
+  "info": {
+    "name": "TruePulse AI - Jira Integration API",
+    "description": "Collection for testing Jira integration endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"your_email@example.com\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jira Integration",
+      "item": [
+        {
+          "name": "Create Integration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jiraUrl\": \"https://ravurinagaphanindra.atlassian.net\",\n  \"jiraEmail\": \"your_email@example.com\",\n  \"apiToken\": \"your_api_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations"]
+            }
+          }
+        },
+        {
+          "name": "Get All Integrations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Integrations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations/active",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations", "active"]
+            }
+          }
+        },
+        {
+          "name": "Test Connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations/{{integration_id}}/test",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations", "{{integration_id}}", "test"]
+            }
+          }
+        },
+        {
+          "name": "Fetch Jira Story",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations/{{integration_id}}/story/PROJ-1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations", "{{integration_id}}", "story", "PROJ-1"]
+            }
+          }
+        },
+        {
+          "name": "Update Integration",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jiraUrl\": \"https://ravurinagaphanindra.atlassian.net\",\n  \"jiraEmail\": \"new_email@example.com\",\n  \"apiToken\": \"new_api_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations/{{integration_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations", "{{integration_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Integration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations/{{integration_id}}/deactivate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations", "{{integration_id}}", "deactivate"]
+            }
+          }
+        },
+        {
+          "name": "Delete Integration",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jira/integrations/{{integration_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jira", "integrations", "{{integration_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Feature Memory",
+      "item": [
+        {
+          "name": "Create Memory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jiraIntegrationId\": \"{{integration_id}}\",\n  \"jiraStoryKey\": \"PROJ-1\",\n  \"initialDescription\": \"Initial context and requirements for this feature. Include what was discussed in meetings, key decisions made, and any important constraints.\",\n  \"branchName\": \"feature/PROJ-1-description\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories"]
+            }
+          }
+        },
+        {
+          "name": "Get All Memories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories?status=active&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Memories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories?search=PROJ&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "PROJ"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Memory Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Memory",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"initialDescription\": \"Updated context for this feature...\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Complete Memory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Archive Memory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/archive",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "archive"]
+            }
+          }
+        },
+        {
+          "name": "Delete Memory",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Discussions",
+      "item": [
+        {
+          "name": "Add Discussion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discussionText\": \"User should be able to cancel payment at any time during checkout\",\n  \"decisionType\": \"edge-case\",\n  \"tags\": [\"payment\", \"cancellation\", \"ux\"],\n  \"meetingDate\": \"2026-03-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/discussions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "discussions"]
+            }
+          }
+        },
+        {
+          "name": "Get All Discussions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/discussions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "discussions"]
+            }
+          }
+        },
+        {
+          "name": "Get Edge Cases Only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/discussions?type=edge-case",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "discussions"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "edge-case"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Requirements Only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/discussions?type=requirement",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "discussions"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "requirement"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Decisions/Changes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feature-memories/{{memory_id}}/discussions?type=change",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feature-memories", "{{memory_id}}", "discussions"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "change"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "integration_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "memory_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
+
