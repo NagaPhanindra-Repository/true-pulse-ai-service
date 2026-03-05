@@ -22,7 +22,6 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/jira")
-@CrossOrigin(origins = "${app.cors-origins:http://localhost:4200}")
 public class JiraIntegrationController {
 
     private final JiraIntegrationService jiraIntegrationService;

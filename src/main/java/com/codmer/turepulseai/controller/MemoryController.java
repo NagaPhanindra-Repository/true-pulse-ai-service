@@ -23,7 +23,6 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/memories")
-@CrossOrigin(origins = "${app.cors-origins:http://localhost:4200}")
 public class MemoryController {
 
     private final FeatureMemoryService memoryService;
