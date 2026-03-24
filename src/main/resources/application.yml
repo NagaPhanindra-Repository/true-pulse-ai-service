@@ -5,7 +5,8 @@ spring:
     openai:
       chat:
         options:
-          model: gpt-5-mini
+          # Use a temperature-flexible mini model to avoid 400 errors while keeping high TPM
+          model: gpt-4.1-mini
       embedding:
         options:
           model: text-embedding-3-small
