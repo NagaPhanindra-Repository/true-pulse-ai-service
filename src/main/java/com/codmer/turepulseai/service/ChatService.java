@@ -29,6 +29,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.annotation.PreDestroy;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +49,7 @@ public class ChatService {
     private final QuestionRepository questionRepository;
     private final AnswerRepository answerRepository;
     private final UserRepository userRepository;
+    private final TavilySearchService tavilySearchService;
     private final ExecutorService analysisExecutor = Executors.newFixedThreadPool(
             Math.max(30, Runtime.getRuntime().availableProcessors())
     );
@@ -61,15 +65,35 @@ public class ChatService {
         log.info("Received question: {}", request);
 
         List<Message> messages = new ArrayList<>();
+        String userMessage = request.getMessage() == null ? "" : request.getMessage().trim();
 
-        // Optional: system prompt to control behavior
+        boolean useDateTimeTool = shouldUseCurrentDateTimeTool(userMessage);
+        boolean forceWebForTimeSensitive = shouldForceWebForTimeSensitiveQuery(userMessage);
+
+        String webContext = "";
+        if ((shouldUseWebSearch(userMessage) || forceWebForTimeSensitive) && tavilySearchService.isEnabledAndConfigured()) {
+            webContext = tavilySearchService.searchAsContext(userMessage);
+        }
+
         messages.add(new SystemMessage(
                 "You are a helpful assistant in a web chat application. " +
-                        "Keep responses concise and clear."
+                        "Keep responses concise and clear. " +
+                        "If web context is provided, prioritize it for latest/current information and cite source URLs."
         ));
 
+        if (useDateTimeTool) {
+            messages.add(new SystemMessage(buildCurrentDateTimeContext()));
+        }
 
-        messages.add(new UserMessage(request.getMessage()));
+        if (webContext != null && !webContext.isBlank()) {
+            messages.add(new SystemMessage(
+                    "Web search context:\n" + webContext + "\n" +
+                            "Use this context for time-sensitive or factual current-event questions. " +
+                            "If facts are uncertain, say so briefly."
+            ));
+        }
+
+        messages.add(new UserMessage(userMessage));
 
         var prompt = new Prompt(messages);
         var response = chatClient.prompt(prompt).call();
@@ -82,6 +106,62 @@ public class ChatService {
                 "model",
                 Instant.now().getEpochSecond()
         );
+    }
+
+    private boolean shouldUseWebSearch(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("latest")
+                || normalized.contains("news")
+                || normalized.contains("current")
+                || normalized.contains("today")
+                || normalized.contains("recent")
+                || normalized.contains("release")
+                || normalized.contains("update")
+                || normalized.contains("announced");
+    }
+
+    private boolean shouldUseCurrentDateTimeTool(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("current date")
+                || normalized.contains("current time")
+                || normalized.contains("date today")
+                || normalized.contains("what time")
+                || normalized.contains("time now")
+                || normalized.contains("today")
+                || normalized.contains("now")
+                || normalized.contains("weather")
+                || normalized.contains("latest")
+                || normalized.contains("last ");
+    }
+
+    private boolean shouldForceWebForTimeSensitiveQuery(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("weather")
+                || normalized.contains("now")
+                || normalized.contains("today")
+                || normalized.contains("latest")
+                || normalized.contains("last ")
+                || normalized.contains("recent")
+                || normalized.contains("visit")
+                || normalized.contains("trip")
+                || normalized.contains("current");
+    }
+
+    private String buildCurrentDateTimeContext() {
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+        String iso = now.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        String human = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z"));
+        return "Current server date/time context: " + human + " (ISO: " + iso + "). " +
+                "Use this as the reference point for any 'now', 'today', 'latest', or 'last' query.";
     }
 
     /**

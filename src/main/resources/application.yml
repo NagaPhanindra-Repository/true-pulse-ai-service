@@ -42,3 +42,9 @@ app:
   base-url: ${APP_BASE_URL}        # Base URL for constructing links in emails, etc.
   encryption-key: ${ENCRYPTION_KEY}           # base64-encoded 256-bit AES key for encryption
   cors-origins: ${CORS_ORIGINS}  # CORS origins
+  tavily:
+    enabled: ${TAVILY_ENABLED:true}
+    api-key: ${TAVILY_API_KEY:}
+    base-url: ${TAVILY_BASE_URL:https://api.tavily.com}
+    timeout-ms: ${TAVILY_TIMEOUT_MS:2000}
+    max-results: ${TAVILY_MAX_RESULTS:5}
