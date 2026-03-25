@@ -42,8 +42,9 @@ public class BusinessImageServiceImpl implements BusinessImageService {
 
     private static final int DEFAULT_TOP_K = 6;
     private static final String TEXT_OVERLAY_HEADER = "TEXT_OVERLAYS";
+    // We continue to generate overlay metadata, but the image itself must never contain readable text.
     private static final Pattern QUOTED_TEXT_PATTERN = Pattern.compile("\"([^\"]+)\"|'([^']+)'");
-    // Increase max overlay phrases so we can show brand, offer, occasion, CTA
+    // Increase max overlay phrases so we can show brand, offer, occasion, CTA or key message
     private static final int MAX_OVERLAY_PHRASES = 4;
     private static final int MAX_OVERLAY_LENGTH = 64;
     private static final List<String> KNOWN_OCCASIONS = List.of(
@@ -86,23 +87,24 @@ public class BusinessImageServiceImpl implements BusinessImageService {
         String displayName = request.getDisplayName().trim();
         String prompt = request.getPrompt().trim();
 
+        // Backend is now ALWAYS image-only: no readable text must be baked into the generated image.
+        // We still compute rich overlay specs but the frontend is fully responsible for rendering text.
         String renderingMode = request.getRenderingMode();
-        String normalizedMode = renderingMode == null ? "IMAGE_ONLY" : renderingMode.trim().toUpperCase(Locale.ROOT);
-        boolean imageOnlyMode = !"TEXT_OVERLAYS".equals(normalizedMode);
+        String normalizedMode = renderingMode == null ? "TEXT_OVERLAYS" : renderingMode.trim().toUpperCase(Locale.ROOT);
+        boolean imageOnlyMode = true; // force image-only behavior; overlays are always returned as metadata
 
         IntentSummary intentSummary = analyzeIntent(prompt);
 
-        List<String> overlayPhrases = imageOnlyMode ? List.of() : buildOverlayPhrases(prompt, displayName, intentSummary);
-        List<OverlaySpec> overlaySpecs = imageOnlyMode ? List.of() : buildOverlaySpecs(displayName, intentSummary, overlayPhrases);
+        List<String> overlayPhrases = buildOverlayPhrases(prompt, displayName, intentSummary);
+        List<OverlaySpec> overlaySpecs = buildOverlaySpecs(displayName, intentSummary, overlayPhrases);
 
         List<String> contextChunks = getContextChunks(entityId, displayName, prompt);
         String contextText = contextChunks.isEmpty()
                 ? "No relevant business document context found."
                 : String.join("\n\n", contextChunks);
 
-        String revisedPrompt = imageOnlyMode
-                ? buildImagePromptWithBakedText(prompt, displayName, contextText, intentSummary)
-                : buildImagePrompt(prompt, displayName, contextText, intentSummary, overlayPhrases);
+        // Always build a text-free image prompt that only describes visuals and explicitly forbids readable text.
+        String revisedPrompt = buildTextFreeImagePrompt(prompt, displayName, contextText, intentSummary);
 
         try {
             String normalizedSize = normalizeSize(request.getSize());
@@ -127,7 +129,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                         .revisedPrompt(revisedPrompt)
                         .entityId(request.getEntityId())
                         .displayName(displayName)
-                        .overlays(imageOnlyMode ? null : overlaySpecs)
+                        .overlays(overlaySpecs)
                         .build();
             }
 
@@ -145,7 +147,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                         .revisedPrompt(revisedPrompt)
                         .entityId(request.getEntityId())
                         .displayName(displayName)
-                        .overlays(imageOnlyMode ? null : overlaySpecs)
+                        .overlays(overlaySpecs)
                         .build();
             }
 
@@ -156,7 +158,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                     .revisedPrompt(revisedPrompt)
                     .entityId(request.getEntityId())
                     .displayName(displayName)
-                    .overlays(imageOnlyMode ? null : overlaySpecs)
+                    .overlays(overlaySpecs)
                     .build();
         } catch (IllegalArgumentException ex) {
             log.warn("Invalid image size requested for entityId={}: {}", request.getEntityId(), ex.getMessage());
@@ -166,7 +168,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                     .revisedPrompt(revisedPrompt)
                     .entityId(request.getEntityId())
                     .displayName(displayName)
-                    .overlays(imageOnlyMode ? null : overlaySpecs)
+                    .overlays(overlaySpecs)
                     .build();
         } catch (Exception ex) {
             log.error("Image generation failed for entityId={}: {}", request.getEntityId(), ex.getMessage(), ex);
@@ -176,7 +178,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                     .revisedPrompt(revisedPrompt)
                     .entityId(request.getEntityId())
                     .displayName(displayName)
-                    .overlays(imageOnlyMode ? null : overlaySpecs)
+                    .overlays(overlaySpecs)
                     .build();
         }
     }
@@ -478,51 +480,31 @@ public class BusinessImageServiceImpl implements BusinessImageService {
         return fallback.toString().trim();
     }
 
-    private String buildImagePromptWithBakedText(String userPrompt, String displayName, String contextText,
-                                                 IntentSummary summary) {
+    private String buildTextFreeImagePrompt(String userPrompt,
+                                            String displayName,
+                                            String contextText,
+                                            IntentSummary summary) {
         String intentSummaryBlock = describeIntentSummary(summary, displayName);
 
         String system = "You are a world-class senior visual designer and art director for brand posters and campaigns. " +
-                "You specialize in marketing visuals for small businesses, doctors, lawyers, politicians, business leaders, and celebrities. " +
-                "Your job is to design launch and event posters, festival greetings, happy hour offers, and release announcements at the quality of top global brands. " +
-                "You must produce a SINGLE, COMPACT image description for a poster with all important text already designed and rendered INSIDE the image. " +
-                "Your design MUST clearly and legibly include exactly three key textual elements: (1) the business name, (2) the main offer, and (3) the occasion or event for this poster. " +
-                "Never invent new slogans, prices, offers, business names, or occasions. Use only the business display name provided and any offer/occasion detected from the prompt. ";
-
-        StringBuilder keyLines = new StringBuilder();
-        if (displayName != null && !displayName.isBlank()) {
-            keyLines.append("- Business name line: use the exact display name '")
-                    .append(displayName.trim().replace("\"", "'"))
-                    .append("' as a prominent brand heading.\n");
-        }
-        if (summary != null && summary.offer != null && !summary.offer.isBlank()) {
-            keyLines.append("- Offer line: use the exact phrase '")
-                    .append(summary.offer.replace("\"", "'"))
-                    .append("' as the main promotional message.\n");
-        }
-        if (summary != null && summary.occasion != null && !summary.occasion.isBlank()) {
-            keyLines.append("- Occasion line: include a short line such as 'Celebrate ")
-                    .append(summary.occasion.replace("\"", "'"))
-                    .append("' or an equivalent that clearly states the occasion.\n");
-        }
+                "You specialize in marketing visuals for restaurants, doctors, lawyers, politicians, business leaders, celebrities, and many other professionals. " +
+                "Your job is to design launch and event posters, festival greetings, upcoming campaign visuals, release announcements, and offer posters at the quality of top global brands. " +
+                "You must ONLY describe the visual scene for a poster, WITHOUT any readable text, logos, or typography.\n" +
+                "CRITICAL RULES:\n" +
+                "- Do NOT include any readable words, letters, numbers, signatures, or logos anywhere in the image.\n" +
+                "- Avoid shop signs, packaging labels, banners, or boards with readable text; if such elements appear, they must be abstract shapes or blurred marks with no legible content.\n" +
+                "- Reserve clear negative space for where text overlays will be added later (for example, a clean band at the top for the brand name, a clean band at the bottom for the offer, and a clear area for event/occasion headline), but do NOT render the text itself.\n" +
+                "- Focus on composition, lighting, color palette, and subject placement that match the business or personality and the occasion.\n" +
+                "- Respect the reputation of professionals, celebrities, and public figures; keep visuals tasteful, brand-safe, and culturally respectful.";
 
         String user = "Business or personality display name: " + displayName + "\n\n" +
-                "Intent summary (what this image is for):\n" + intentSummaryBlock + "\n\n" +
-                "Business / personal context from uploaded documents (this describes their brand, services, style, or profile; align with it carefully):\n" + contextText + "\n\n" +
-                "User prompt (for reference only, do not restate word-for-word):\n" + userPrompt + "\n\n" +
-                "Design a single, best-in-class marketing poster image that ALREADY includes the three key text elements inside the image: the business name, the main offer, and the occasion/event.\n" +
-                "Typography and layout rules:\n" +
-                "- Treat the business name, offer, and occasion lines as the only major readable text in the poster unless the user explicitly provided a call-to-action.\n" +
-                "- Use clean, professional, mostly sans-serif fonts unless a different style is clearly implied by the context.\n" +
-                "- All text must be spelled correctly in clear English; avoid any misspellings, random characters, or lorem ipsum.\n" +
-                "- Reserve dedicated, uncluttered areas for each text block so that no text overlaps another or important visual elements.\n" +
-                "- Ensure very high contrast between text and its immediate background (e.g., light text on dark panel or dark text on light panel).\n" +
-                "- Avoid placing text over highly detailed or busy backgrounds; use solid or softly gradient panels or clean negative space.\n" +
-                "- Use each of the three key phrases at most once to avoid clutter and repetition.\n" +
-                "- Do not add extra taglines, discounts, or prices that were not provided.\n" +
-                "Key text lines to include exactly:\n" +
-                keyLines +
-                "Describe the final image in one concise paragraph (max 80 words), focusing on composition, colors, lighting, and clear placement of these three textual elements inside the image.";
+                "Intent summary (what this poster is for – event, offer, occasion, or announcement):\n" + intentSummaryBlock + "\n\n" +
+                "Business / personal context from uploaded documents (describes brand, services, profile, goals – use this to align style and audience):\n" + contextText + "\n\n" +
+                "User prompt (for reference; do not copy text into the image):\n" + userPrompt + "\n\n" +
+                "Now respond with a single section: IMAGE_DESCRIPTION.\n" +
+                "IMAGE_DESCRIPTION must be a single paragraph (max 80–100 words) that describes only the visual scene for a best-in-the-world poster for this person or business.\n" +
+                "Describe subjects, camera angle, lighting, background, color palette, and key focal areas, and explicitly keep some clean areas where the brand name, occasion or campaign title, offer or message, and CTA text can be added later by another system.\n" +
+                "Do NOT include any example text, slogans, numbers, or quotes in IMAGE_DESCRIPTION; just describe visuals and layout regions.";
 
         try {
             Prompt prompt = new Prompt(List.of(
@@ -531,15 +513,34 @@ public class BusinessImageServiceImpl implements BusinessImageService {
             ));
             String generated = chatClient.prompt(prompt).call().content();
             if (generated != null && !generated.isBlank()) {
-                return generated.trim();
+                String trimmed = generated.trim();
+                // If the model returns extra sections, try to keep only the IMAGE_DESCRIPTION part.
+                int idx = trimmed.toUpperCase(Locale.ROOT).indexOf("IMAGE_DESCRIPTION");
+                if (idx >= 0) {
+                    int colon = trimmed.indexOf(':', idx);
+                    if (colon >= 0 && colon + 1 < trimmed.length()) {
+                        return trimmed.substring(colon + 1).trim();
+                    }
+                }
+                return trimmed;
             }
         } catch (Exception ex) {
-            log.warn("Failed to refine baked-text image prompt with LLM, using fallback prompt: {}", ex.getMessage());
+            log.warn("Failed to refine text-free image prompt with LLM, using fallback prompt: {}", ex.getMessage());
         }
 
-        return "Create a premium, world-class marketing poster for " + displayName +
-                " that already includes, as clearly readable text, the business name, the main offer, and the occasion/event inside the image. " +
-                "Use a clean, legible layout with no overlapping text, high contrast between text and background, and a cohesive color palette that matches the brand and occasion.";
+        // Fallback: simple, local prompt without any text instructions
+        String occasion = (summary != null) ? summary.occasion : null;
+        String hero = (summary != null) ? summary.heroProduct : null;
+        StringBuilder fallback = new StringBuilder();
+        fallback.append("Create a premium, world-class poster-style marketing image for ")
+                .append(displayName)
+                .append(". Focus only on visuals with no readable text or logos. ")
+                .append("Use a cohesive color palette and composition suitable for ")
+                .append(occasion != null ? occasion : "a key event or campaign")
+                .append(". Highlight ")
+                .append(hero != null ? hero : "the core service or personality")
+                .append(", and leave clear, uncluttered areas at the top and bottom where text can be added later by the frontend.");
+        return fallback.toString();
     }
 
     private List<String> buildOverlayPhrases(String userPrompt, String displayName, IntentSummary summary) {
