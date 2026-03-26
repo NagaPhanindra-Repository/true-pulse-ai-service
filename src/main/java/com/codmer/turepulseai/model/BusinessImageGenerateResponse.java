@@ -28,5 +28,8 @@ public class BusinessImageGenerateResponse {
         private String text;      // exact phrase, already normalized
         private String zone;      // top center, bottom bar, upper middle, bottom right, etc.
         private String size;      // small, medium, large
+        // Future-friendly: optional category and priority hints so clients can style overlays better
+        private String category;  // entityName, event, campaign, offer, cta, contact, location, etc.
+        private Integer priority; // 1 = highest emphasis, larger numbers = less prominent
     }
 }

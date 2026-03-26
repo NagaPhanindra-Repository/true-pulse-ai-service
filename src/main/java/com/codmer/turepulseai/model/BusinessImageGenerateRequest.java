@@ -12,12 +12,12 @@ public class BusinessImageGenerateRequest {
     private String size;
 
     /**
-     * Rendering mode for text.
+     * Rendering mode hint for clients.
      * <p>
-     * IMAGE_ONLY  - AI generates a complete poster image with all important text baked into the image itself.
-     * TEXT_OVERLAYS - AI generates an image plus structured overlay specs for clients that render text on top.
-     * <p>
-     * If null or unrecognized, the service will choose a default mode (currently IMAGE_ONLY).
+     * The backend now always generates a clean, text-free image and returns structured overlay
+     * metadata so that the frontend can render all readable text. This field is kept only as a
+     * hint or for future evolution of the client experience; it no longer changes how the
+     * backend constructs the image.
      */
     private String renderingMode;
 }

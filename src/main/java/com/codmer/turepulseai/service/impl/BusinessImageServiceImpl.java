@@ -28,10 +28,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,6 +45,11 @@ public class BusinessImageServiceImpl implements BusinessImageService {
     // Increase max overlay phrases so we can show brand, offer, occasion, CTA or key message
     private static final int MAX_OVERLAY_PHRASES = 4;
     private static final int MAX_OVERLAY_LENGTH = 64;
+    // OpenAI image models currently enforce a maximum prompt length of 4000 characters.
+    // We keep a safety margin so we never hit the hard limit even if the provider
+    // counts bytes differently. This is ONLY for the image prompt string we send
+    // to the ImageModel, not for the user-visible fields.
+    private static final int MAX_IMAGE_PROMPT_CHARS = 3800;
     private static final List<String> KNOWN_OCCASIONS = List.of(
             "holi", "diwali", "eid", "christmas", "thanksgiving", "new year", "valentine's day", "navratri");
     private static final List<String> HERO_KEYWORDS = List.of(
@@ -89,10 +92,6 @@ public class BusinessImageServiceImpl implements BusinessImageService {
 
         // Backend is now ALWAYS image-only: no readable text must be baked into the generated image.
         // We still compute rich overlay specs but the frontend is fully responsible for rendering text.
-        String renderingMode = request.getRenderingMode();
-        String normalizedMode = renderingMode == null ? "TEXT_OVERLAYS" : renderingMode.trim().toUpperCase(Locale.ROOT);
-        boolean imageOnlyMode = true; // force image-only behavior; overlays are always returned as metadata
-
         IntentSummary intentSummary = analyzeIntent(prompt);
 
         List<String> overlayPhrases = buildOverlayPhrases(prompt, displayName, intentSummary);
@@ -104,7 +103,8 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                 : String.join("\n\n", contextChunks);
 
         // Always build a text-free image prompt that only describes visuals and explicitly forbids readable text.
-        String revisedPrompt = buildTextFreeImagePrompt(prompt, displayName, contextText, intentSummary);
+        String rawPrompt = buildTextFreeImagePrompt(prompt, displayName, contextText, intentSummary);
+        String revisedPrompt = ensurePromptWithinLimit(rawPrompt);
 
         try {
             String normalizedSize = normalizeSize(request.getSize());
@@ -120,7 +120,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
             );
 
             ImageResponse imageResponse = imageModel.call(imagePrompt);
-            List<ImageGeneration> generations = (imageResponse != null) ? imageResponse.getResults() : null;
+            List<ImageGeneration> generations = imageResponse.getResults();
             if (generations == null || generations.isEmpty()) {
                 log.warn("Image provider returned empty result list for entityId={} displayName={}", request.getEntityId(), displayName);
                 return BusinessImageGenerateResponse.builder()
@@ -135,12 +135,11 @@ public class BusinessImageServiceImpl implements BusinessImageService {
 
             ImageGeneration generation = generations.get(0);
             Object rawOutput = generation.getOutput();
-            log.debug("Image generation raw output type: {}", rawOutput != null ? rawOutput.getClass() : "null");
+            log.debug("Image generation raw output type: {}", rawOutput.getClass());
             String imageBase64 = extractImageBase64(rawOutput);
             if (imageBase64 == null || imageBase64.isBlank()) {
                 log.warn("Unsupported image payload format for entityId={}, displayName={}, outputType={}",
-                        request.getEntityId(), displayName,
-                        rawOutput != null ? rawOutput.getClass() : "null");
+                        request.getEntityId(), displayName, rawOutput.getClass());
                 return BusinessImageGenerateResponse.builder()
                         .success(false)
                         .error("Image provider returned unsupported payload format")
@@ -239,25 +238,44 @@ public class BusinessImageServiceImpl implements BusinessImageService {
             String role;
             String zone;
             String size;
+            String category;
+            int priority;
 
             if (isBrand) {
                 role = "brand";
                 zone = "top-center";
                 size = "large";
+                category = "entityName";
+                priority = 1;
             } else if (isOffer) {
                 role = "offer";
                 zone = "bottom-bar";
                 size = "large";
+                category = "offer";
+                priority = 2;
             } else if (isOccasion) {
                 role = "headline";
                 zone = "upper-middle";
                 size = "medium"; // avoid small fonts
+                category = "event";
+                priority = 2;
             } else {
                 role = (slot == 1) ? "headline" : "details";
                 zone = (slot == 1) ? "top-banner" : "bottom-right";
                 // Previously non-primary overlays used "small"; to avoid
                 // unreadable small fonts, keep everything at medium or larger.
                 size = (slot == 1) ? "large" : "medium";
+                // Heuristically classify remaining phrases using summary fields
+                if (summary != null && summary.occasion != null && text.toLowerCase(Locale.ROOT).contains(summary.occasion.toLowerCase(Locale.ROOT))) {
+                    category = "event";
+                    priority = 2;
+                } else if (CTA_PATTERN.matcher(text).find()) {
+                    category = "cta";
+                    priority = 3;
+                } else {
+                    category = "details";
+                    priority = 4;
+                }
             }
 
             specs.add(OverlaySpec.builder()
@@ -266,6 +284,8 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                     .text(text)
                     .zone(zone)
                     .size(size)
+                    .category(category)
+                    .priority(priority)
                     .build());
             slot++;
             if (slot > MAX_OVERLAY_PHRASES) {
@@ -480,67 +500,108 @@ public class BusinessImageServiceImpl implements BusinessImageService {
         return fallback.toString().trim();
     }
 
+    /**
+     * Ensure the final image prompt we send to the provider is safely below the
+     * known maximum length. The earlier implementation tried to trim a
+     * non-existent "BUSINESS / DOCUMENT CONTEXT" marker, which meant some
+     * prompts were never shortened and could exceed the provider's 4000-char
+     * hard limit when business document context was long.
+     *
+     * We now treat the prompt as two conceptual segments: a short "system"
+     * preamble and a longer "user/context" body. We split on the first blank
+     * line and trim only the trailing body portion, preserving the critical
+     * system instructions while guaranteeing that the final string is always
+     * <= MAX_IMAGE_PROMPT_CHARS.
+     */
+    private String ensurePromptWithinLimit(String prompt) {
+        if (prompt == null) {
+            return null;
+        }
+        if (prompt.length() <= MAX_IMAGE_PROMPT_CHARS) {
+            return prompt;
+        }
+
+        // Try to preserve the initial system instructions block (before first
+        // double newline) and trim only the rest.
+        String separator = "\n\n";
+        int sepIndex = prompt.indexOf(separator);
+        if (sepIndex <= 0) {
+            // No clear split between system and user, just trim at a safe
+            // boundary and avoid cutting mid-line.
+            String shortened = prompt.substring(0, MAX_IMAGE_PROMPT_CHARS);
+            int lastNewline = shortened.lastIndexOf('\n');
+            if (lastNewline > 0) {
+                shortened = shortened.substring(0, lastNewline);
+            }
+            return shortened.trim();
+        }
+
+        String systemPart = prompt.substring(0, sepIndex + separator.length());
+        String bodyPart = prompt.substring(sepIndex + separator.length());
+
+        if (systemPart.length() >= MAX_IMAGE_PROMPT_CHARS) {
+            // Extremely unlikely – fall back to hard trim of the whole prompt.
+            String shortened = systemPart.substring(0, MAX_IMAGE_PROMPT_CHARS);
+            int lastNewline = shortened.lastIndexOf('\n');
+            if (lastNewline > 0) {
+                shortened = shortened.substring(0, lastNewline);
+            }
+            return shortened.trim();
+        }
+
+        int remaining = MAX_IMAGE_PROMPT_CHARS - systemPart.length();
+        if (bodyPart.length() <= remaining) {
+            return (systemPart + bodyPart).trim();
+        }
+
+        String shortenedBody = bodyPart.substring(0, remaining);
+        int lastNewline = shortenedBody.lastIndexOf('\n');
+        if (lastNewline > 0) {
+            shortenedBody = shortenedBody.substring(0, lastNewline);
+        }
+        return (systemPart + shortenedBody).trim();
+    }
+
     private String buildTextFreeImagePrompt(String userPrompt,
                                             String displayName,
                                             String contextText,
                                             IntentSummary summary) {
+        String system = "You are a world-class senior visual designer and art director who creates campaign and event posters for all kinds of entities: " +
+                "restaurants, doctors, lawyers, business leaders, politicians, celebrities, content creators and small businesses. " +
+                "You design top-tier, brand-safe visuals for launches, releases, awareness drives, offers, seasonal greetings, " +
+                "upcoming events, rallies, concerts, movie or album launches, product announcements and professional campaigns.\n" +
+                "YOUR OUTPUT WILL BE USED ONLY AS AN IMAGE BACKGROUND. THE FRONTEND WILL RENDER ALL TEXT AS OVERLAYS.\n" +
+                "Therefore, the generated image MUST NOT contain any readable text, lettering, numbers, signs, logos or labels.\n" +
+                "- Do NOT draw brand names, offers, dates, prices, slogans, or any other readable words in the scene.\n" +
+                "- Any boards, banners, packaging, shop signs, posters, or documents in the image must be blank, abstract, or contain only non-readable squiggles and shapes.\n" +
+                "- Focus entirely on composition, lighting, subject placement, colors, and atmosphere so that text can be cleanly added later on top.\n" +
+                "- Leave generous negative space where text overlays can later sit (top banner, center focus, bottom bar, side panels), but keep that space visually integrated (subtle gradients, texture, bokeh, or soft shapes).\n" +
+                "- Respect the tone and profession: clinical and trustworthy for doctors, authoritative yet approachable for lawyers and politicians, vibrant and appetizing for restaurants, aspirational and stylish for celebrities and product launches, etc.\n" +
+                "- Always design at the quality level of global brand campaigns.\n" +
+                "- Keep faces, key dishes, venues, or hero objects clearly visible and not covered by imaginary text.\n" +
+                "- Never place fake UI elements, chat bubbles, or phone screenshots unless explicitly requested by the user.\n" +
+                "- The image should be self-explanatory about the theme (festival, sale, health camp, rally, concert, launch, etc.) even without any text.\n";
+
         String intentSummaryBlock = describeIntentSummary(summary, displayName);
 
-        String system = "You are a world-class senior visual designer and art director for brand posters and campaigns. " +
-                "You specialize in marketing visuals for restaurants, doctors, lawyers, politicians, business leaders, celebrities, and many other professionals. " +
-                "Your job is to design launch and event posters, festival greetings, upcoming campaign visuals, release announcements, and offer posters at the quality of top global brands. " +
-                "You must ONLY describe the visual scene for a poster, WITHOUT any readable text, logos, or typography.\n" +
-                "CRITICAL RULES:\n" +
-                "- Do NOT include any readable words, letters, numbers, signatures, or logos anywhere in the image.\n" +
-                "- Avoid shop signs, packaging labels, banners, or boards with readable text; if such elements appear, they must be abstract shapes or blurred marks with no legible content.\n" +
-                "- Reserve clear negative space for where text overlays will be added later (for example, a clean band at the top for the brand name, a clean band at the bottom for the offer, and a clear area for event/occasion headline), but do NOT render the text itself.\n" +
-                "- Focus on composition, lighting, color palette, and subject placement that match the business or personality and the occasion.\n" +
-                "- Respect the reputation of professionals, celebrities, and public figures; keep visuals tasteful, brand-safe, and culturally respectful.";
+        StringBuilder user = new StringBuilder();
+        user.append("USER PROMPT (raw request): \n").append(userPrompt).append("\n\n");
+        user.append("ENTITY / BRAND DISPLAY NAME: ").append(displayName).append("\n\n");
+        user.append("INTENT SUMMARY (interpreted goal of the poster): \n")
+                .append(intentSummaryBlock).append("\n\n");
+        user.append("BUSINESS / DOCUMENT CONTEXT (for visual tone and authenticity only, NOT for direct text):\n")
+                .append(contextText).append("\n\n");
+        user.append("IMAGE REQUIREMENTS (IMPORTANT):\n");
+        user.append("- Generate a single, high-quality poster-style image.\n");
+        user.append("- Absolutely no readable text, numbers, or logos anywhere in the image.\n");
+        user.append("- Clearly communicate the kind of event, campaign, or message visually (e.g., restaurant Holi offer, doctor health camp, politician rally, product launch).\n");
+        user.append("- Include clear focal areas where future text overlays from the frontend can be placed without covering critical faces or hero objects.\n");
+        user.append("- Use lighting, depth of field, props, and color palette to match the intent and profession.\n");
+        user.append("- Design as if you are a senior poster designer working for the best brands in the world.\n");
 
-        String user = "Business or personality display name: " + displayName + "\n\n" +
-                "Intent summary (what this poster is for – event, offer, occasion, or announcement):\n" + intentSummaryBlock + "\n\n" +
-                "Business / personal context from uploaded documents (describes brand, services, profile, goals – use this to align style and audience):\n" + contextText + "\n\n" +
-                "User prompt (for reference; do not copy text into the image):\n" + userPrompt + "\n\n" +
-                "Now respond with a single section: IMAGE_DESCRIPTION.\n" +
-                "IMAGE_DESCRIPTION must be a single paragraph (max 80–100 words) that describes only the visual scene for a best-in-the-world poster for this person or business.\n" +
-                "Describe subjects, camera angle, lighting, background, color palette, and key focal areas, and explicitly keep some clean areas where the brand name, occasion or campaign title, offer or message, and CTA text can be added later by another system.\n" +
-                "Do NOT include any example text, slogans, numbers, or quotes in IMAGE_DESCRIPTION; just describe visuals and layout regions.";
-
-        try {
-            Prompt prompt = new Prompt(List.of(
-                    new SystemMessage(system),
-                    new UserMessage(user)
-            ));
-            String generated = chatClient.prompt(prompt).call().content();
-            if (generated != null && !generated.isBlank()) {
-                String trimmed = generated.trim();
-                // If the model returns extra sections, try to keep only the IMAGE_DESCRIPTION part.
-                int idx = trimmed.toUpperCase(Locale.ROOT).indexOf("IMAGE_DESCRIPTION");
-                if (idx >= 0) {
-                    int colon = trimmed.indexOf(':', idx);
-                    if (colon >= 0 && colon + 1 < trimmed.length()) {
-                        return trimmed.substring(colon + 1).trim();
-                    }
-                }
-                return trimmed;
-            }
-        } catch (Exception ex) {
-            log.warn("Failed to refine text-free image prompt with LLM, using fallback prompt: {}", ex.getMessage());
-        }
-
-        // Fallback: simple, local prompt without any text instructions
-        String occasion = (summary != null) ? summary.occasion : null;
-        String hero = (summary != null) ? summary.heroProduct : null;
-        StringBuilder fallback = new StringBuilder();
-        fallback.append("Create a premium, world-class poster-style marketing image for ")
-                .append(displayName)
-                .append(". Focus only on visuals with no readable text or logos. ")
-                .append("Use a cohesive color palette and composition suitable for ")
-                .append(occasion != null ? occasion : "a key event or campaign")
-                .append(". Highlight ")
-                .append(hero != null ? hero : "the core service or personality")
-                .append(", and leave clear, uncluttered areas at the top and bottom where text can be added later by the frontend.");
-        return fallback.toString();
+        // We only need to return a single combined textual prompt string for the ImageModel.
+        // The Spring AI ImageModel will take this description and generate a text-free image.
+        return (system + "\n\n" + user).trim();
     }
 
     private List<String> buildOverlayPhrases(String userPrompt, String displayName, IntentSummary summary) {
