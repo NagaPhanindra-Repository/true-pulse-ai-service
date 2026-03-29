@@ -154,7 +154,7 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                     .success(true)
                     .mimeType("image/png")
                     .imageBase64(imageBase64)
-                    .revisedPrompt(revisedPrompt)
+//                    .revisedPrompt(revisedPrompt)
                     .entityId(request.getEntityId())
                     .displayName(displayName)
                     .overlays(overlaySpecs)
@@ -180,6 +180,134 @@ public class BusinessImageServiceImpl implements BusinessImageService {
                     .overlays(overlaySpecs)
                     .build();
         }
+    }
+
+    @Override
+    public BusinessImageGenerateResponse regenerate(BusinessImageGenerateRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request is required");
+        }
+        if (request.getEntityId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entityId is required");
+        }
+        if (request.getDisplayName() == null || request.getDisplayName().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "displayName is required");
+        }
+        if (request.getPrompt() == null || request.getPrompt().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "prompt is required");
+        }
+        if (request.getBaseImage() == null || request.getBaseImage().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "baseImage is required for regenerate");
+        }
+
+        // For now we use the same core pipeline as generate(), but we explicitly annotate
+        // the prompt so the image model understands this is a refinement of an existing
+        // visual instead of a brand new composition.
+        Long entityId = request.getEntityId();
+        String displayName = request.getDisplayName().trim();
+        String prompt = request.getPrompt().trim();
+
+        IntentSummary intentSummary = analyzeIntent(prompt);
+        List<String> overlayPhrases = buildOverlayPhrases(prompt, displayName, intentSummary);
+        List<OverlaySpec> overlaySpecs = buildOverlaySpecs(displayName, intentSummary, overlayPhrases);
+
+        List<String> contextChunks = getContextChunks(entityId, displayName, prompt);
+        String contextText = contextChunks.isEmpty()
+                ? "No relevant business document context found."
+                : String.join("\n\n", contextChunks);
+
+        String baseImageHint = buildBaseImageHint(request.getBaseImage());
+        String rawPrompt = buildTextFreeImagePrompt(
+                prompt + "\n\nPlease treat the provided base image as the visual starting point and only refine composition, color grading, lighting, background richness and minor layout tweaks based on the new suggestions, while keeping the overall identity and subject consistent. " + baseImageHint,
+                displayName,
+                contextText,
+                intentSummary
+        );
+        String revisedPrompt = ensurePromptWithinLimit(rawPrompt);
+
+        try {
+            String normalizedSize = normalizeSize(request.getSize());
+            int width = parseDimension(normalizedSize, 0);
+            int height = parseDimension(normalizedSize, 1);
+
+            ImagePrompt imagePrompt = new ImagePrompt(
+                    revisedPrompt,
+                    ImageOptionsBuilder.builder()
+                            .width(width)
+                            .height(height)
+                            .build()
+            );
+
+            ImageResponse imageResponse = imageModel.call(imagePrompt);
+            List<ImageGeneration> generations = imageResponse.getResults();
+            if (generations == null || generations.isEmpty()) {
+                log.warn("Image provider returned empty result list for regenerate entityId={} displayName={}", request.getEntityId(), displayName);
+                return BusinessImageGenerateResponse.builder()
+                        .success(false)
+                        .error("Image provider returned empty response")
+                        .revisedPrompt(revisedPrompt)
+                        .entityId(request.getEntityId())
+                        .displayName(displayName)
+                        .overlays(overlaySpecs)
+                        .build();
+            }
+
+            ImageGeneration generation = generations.get(0);
+            Object rawOutput = generation.getOutput();
+            String imageBase64 = extractImageBase64(rawOutput);
+            if (imageBase64 == null || imageBase64.isBlank()) {
+                log.warn("Unsupported image payload format for regenerate entityId={}, displayName={}, outputType={}",
+                        request.getEntityId(), displayName, rawOutput.getClass());
+                return BusinessImageGenerateResponse.builder()
+                        .success(false)
+                        .error("Image provider returned unsupported payload format")
+                        .revisedPrompt(revisedPrompt)
+                        .entityId(request.getEntityId())
+                        .displayName(displayName)
+                        .overlays(overlaySpecs)
+                        .build();
+            }
+
+            return BusinessImageGenerateResponse.builder()
+                    .success(true)
+                    .mimeType("image/png")
+                    .imageBase64(imageBase64)
+                    .revisedPrompt(revisedPrompt)
+                    .entityId(request.getEntityId())
+                    .displayName(displayName)
+                    .overlays(overlaySpecs)
+                    .build();
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid image size requested for regenerate entityId={}: {}", request.getEntityId(), ex.getMessage());
+            return BusinessImageGenerateResponse.builder()
+                    .success(false)
+                    .error("Invalid image size. Please use WIDTHxHEIGHT, e.g. 1024x1024.")
+                    .revisedPrompt(revisedPrompt)
+                    .entityId(request.getEntityId())
+                    .displayName(displayName)
+                    .overlays(overlaySpecs)
+                    .build();
+        } catch (Exception ex) {
+            log.error("Image re-generation failed for entityId={}: {}", request.getEntityId(), ex.getMessage(), ex);
+            return BusinessImageGenerateResponse.builder()
+                    .success(false)
+                    .error("Failed to regenerate image: " + ex.getMessage())
+                    .revisedPrompt(revisedPrompt)
+                    .entityId(request.getEntityId())
+                    .displayName(displayName)
+                    .overlays(overlaySpecs)
+                    .build();
+        }
+    }
+
+    private String buildBaseImageHint(String baseImage) {
+        if (baseImage == null || baseImage.trim().isEmpty()) {
+            return "";
+        }
+        String value = baseImage.trim();
+        // Do not actually send raw base64 (to keep prompt small); just indicate its presence and type.
+        String typeHint = value.startsWith("data:image/") ? value.substring(5, value.indexOf(";")) : "image";
+        return "Use the previously approved " + typeHint + " as the baseline visual reference; keep core subjects, brand mood and composition direction consistent while applying the new ideas from this prompt.";
     }
 
     private String normalizeSize(String size) {
