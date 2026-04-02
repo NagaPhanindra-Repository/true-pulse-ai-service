@@ -235,6 +235,7 @@ public class RetroServiceImpl implements RetroService {
             List<Retro> pastRetros = retroRepository.findByUserIdAndCreatedAtBeforeOrderByCreatedAtDesc(
                     retro.getUser().getId(), retro.getCreatedAt());
             pastRetros.forEach(this::initializeRetroCollections);
+                String maturityLevel = determineTeamMaturity(retro, pastRetros);
 
             String retroUserName = retro.getUser().getUserName();
 
@@ -268,7 +269,7 @@ public class RetroServiceImpl implements RetroService {
             String pastRetrosSummary = pastRetrosSummaryFuture.join();
 
             // Merge summaries (sequential, depends on both summaries)
-            String finalSummary = mergeSummaries(currentSummary, pastRetrosSummary);
+            String finalSummary = mergeSummaries(currentSummary, pastRetrosSummary, maturityLevel);
 
             long duration = System.currentTimeMillis() - startTime;
             log.info("Retro analysis completed for retroId: {} in {}ms", retroId, duration);
@@ -423,12 +424,12 @@ public class RetroServiceImpl implements RetroService {
         return content == null ? "No historical analysis available" : content.trim();
     }
 
-    private String mergeSummaries(String currentSummary, String historicalSummary) {
-        return executeWithRetry(() -> mergeSummariesInternal(currentSummary, historicalSummary),
+    private String mergeSummaries(String currentSummary, String historicalSummary, String maturityLevel) {
+        return executeWithRetry(() -> mergeSummariesInternal(currentSummary, historicalSummary, maturityLevel),
                 "Merge summaries", 3);
     }
 
-    private String mergeSummariesInternal(String currentSummary, String historicalSummary) {
+    private String mergeSummariesInternal(String currentSummary, String historicalSummary, String maturityLevel) {
         int kickoffSeed = ThreadLocalRandom.current().nextInt(6);
         String kickoffTone = switch (kickoffSeed) {
             case 0 -> "playful";
@@ -443,6 +444,11 @@ public class RetroServiceImpl implements RetroService {
                 You are a senior retrospective facilitator opening the retro meeting.
                 Combine the current sprint summary and historical patterns into a kickoff summary the team will hear before discussion starts.
                 Start with a feeling-based opener that matches team mood.
+            Team maturity level is %s.
+            Maturity tone guide:
+            - NEW: keep language confidence-building, supportive, and very clear on first practical step.
+            - GROWING: blend encouragement with sharper accountability and execution focus.
+            - MATURE: use high-standard coaching language focused on optimization and measurable impact.
                 You may use natural conversational openers when suitable: "Yay, ...", "Hmm, ...", "Ah, ...", "Oof, ...", "Nice, ...", "Alright, ...", "Phew, ...", "Wow, ...", "Okay team, ...".
                 Produce 3-4 concise lines that cover:
                 - Overall sprint pulse and key feedback (LIKED, LEARNED, LACKED, LONGED_FOR)
@@ -451,18 +457,69 @@ public class RetroServiceImpl implements RetroService {
                 - One clear focus for this retro conversation (next best discussion target)
                 Keep it human, direct, and spoken-language friendly.
                 Avoid robotic or repetitive phrasing. Do not mention AI or models.
-                """;
+            """.formatted(maturityLevel);
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Current Summary:\n" + currentSummary + "\n\nHistorical Summary:\n" + historicalSummary +
+            "\n\nTeam Maturity Level: " + maturityLevel +
                 "\n\nKickoff tone mode: " + kickoffTone +
                 "\nGenerate final 2-3 line kickoff summary for the retro meeting."));
 
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();
         return content == null ? "No combined analysis available" : content.trim();
+    }
+
+    private String determineTeamMaturity(Retro currentRetro, List<Retro> pastRetros) {
+        int historyCount = pastRetros == null ? 0 : pastRetros.size();
+        double completionRate = calculateActionItemCompletionRate(currentRetro, pastRetros);
+        int discussionCount = countDiscussionEntries(currentRetro);
+
+        if (historyCount >= 5 && completionRate >= 0.65 && discussionCount >= 6) {
+            return "MATURE";
+        }
+        if (historyCount >= 2 && completionRate >= 0.35) {
+            return "GROWING";
+        }
+        return "NEW";
+    }
+
+    private double calculateActionItemCompletionRate(Retro currentRetro, List<Retro> pastRetros) {
+        long total = 0;
+        long completed = 0;
+
+        List<ActionItem> currentItems = currentRetro.getActionItems();
+        if (currentItems != null) {
+            total += currentItems.size();
+            completed += currentItems.stream().filter(ActionItem::isCompleted).count();
+        }
+
+        if (pastRetros != null) {
+            for (Retro retro : pastRetros) {
+                List<ActionItem> items = retro.getActionItems();
+                if (items != null) {
+                    total += items.size();
+                    completed += items.stream().filter(ActionItem::isCompleted).count();
+                }
+            }
+        }
+
+        return total == 0 ? 0.0 : (double) completed / total;
+    }
+
+    private int countDiscussionEntries(Retro retro) {
+        if (retro.getFeedbackPoints() == null) {
+            return 0;
+        }
+        int total = 0;
+        for (FeedbackPoint feedbackPoint : retro.getFeedbackPoints()) {
+            if (feedbackPoint.getDiscussions() != null) {
+                total += feedbackPoint.getDiscussions().size();
+            }
+        }
+        return total;
     }
 
     /**

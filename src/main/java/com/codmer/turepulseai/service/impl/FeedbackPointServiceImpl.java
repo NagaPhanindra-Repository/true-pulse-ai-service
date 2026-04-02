@@ -110,6 +110,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         List<Retro> pastRetros = retroRepository.findByUserIdAndCreatedAtBeforeOrderByCreatedAtDesc(
                 retro.getUser().getId(), retro.getCreatedAt());
         String historyContext = buildHistoricalFeedbackContext(pastRetros, currentPoint);
+        String maturityLevel = determineTeamMaturity(retro, pastRetros);
         long contextElapsedMs = System.currentTimeMillis() - contextStartTime;
         log.debug("Context building completed in {}ms", contextElapsedMs);
 
@@ -141,7 +142,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         // Combine results
         String feedbackType = currentPoint.getType().toString();
         String finalSummary = currentSummary.thenCombine(historicalSummary,
-                        (current, historical) -> mergeFeedbackSummaries(current, historical, feedbackType))
+                        (current, historical) -> mergeFeedbackSummaries(current, historical, feedbackType, maturityLevel))
                 .exceptionally(ex -> {
                     log.error("Error in merge summary task: {}", ex.getMessage());
                     return "Analysis completed with limitations. Please try again for full analysis.";
@@ -311,7 +312,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         }
     }
 
-    private String mergeFeedbackSummaries(String currentSummary, String historicalSummary, String feedbackType) {
+    private String mergeFeedbackSummaries(String currentSummary, String historicalSummary, String feedbackType, String maturityLevel) {
         int styleSeed = ThreadLocalRandom.current().nextInt(6);
         String openerStyleMode = switch (styleSeed) {
             case 0 -> "playful";
@@ -332,6 +333,11 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                 Combine the current feedback analysis with historical patterns into a final response.
                 Requirements:
                                                                 - The feedback belongs to section: %s. Use this section explicitly while framing your response.
+                                                                - Team maturity level: %s.
+                                                                - Maturity tone guide:
+                                                                    * NEW: be encouraging, clear, and simple; prioritize confidence-building next steps.
+                                                                    * GROWING: balance encouragement with accountability; suggest one sharper execution improvement.
+                                                                    * MATURE: be direct and high-standard; focus on optimization, ownership, and measurable impact.
                                                                 - Section intent guide:
                                                                     * LIKED: reinforce positives, behaviors to repeat, and momentum.
                                                                     * LEARNED: highlight insight gained and how to apply it next sprint.
@@ -350,12 +356,13 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                                     whether it is recurring/improving, and the most practical next step.
                                 - Add one concise coaching tip framed as collaborative guidance ("let's", "we can", "try").
                                 - Keep it to 1-2 lines, human, direct, and conversational. Do not mention AI or models.
-                """.formatted(feedbackType);
+                """.formatted(feedbackType, maturityLevel);
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
             "Feedback Type Section: " + feedbackType +
+            "\nTeam Maturity Level: " + maturityLevel +
             "\n\n" +
                 "Current Analysis:\n" + currentSummary + "\n\nHistorical Analysis:\n" + historicalSummary +
             "\n\nOpener style mode for this response: " + openerStyleMode +
@@ -372,6 +379,56 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
             log.error("Error merging feedback summaries", ex);
             throw ex;
         }
+    }
+
+    private String determineTeamMaturity(Retro currentRetro, List<Retro> pastRetros) {
+        int historyCount = pastRetros == null ? 0 : pastRetros.size();
+        double completionRate = calculateActionItemCompletionRate(currentRetro, pastRetros);
+        int discussionCount = countDiscussionEntries(currentRetro);
+
+        if (historyCount >= 5 && completionRate >= 0.65 && discussionCount >= 4) {
+            return "MATURE";
+        }
+        if (historyCount >= 2 && completionRate >= 0.35) {
+            return "GROWING";
+        }
+        return "NEW";
+    }
+
+    private double calculateActionItemCompletionRate(Retro currentRetro, List<Retro> pastRetros) {
+        long total = 0;
+        long completed = 0;
+
+        List<ActionItem> currentItems = currentRetro.getActionItems();
+        if (currentItems != null) {
+            total += currentItems.size();
+            completed += currentItems.stream().filter(ActionItem::isCompleted).count();
+        }
+
+        if (pastRetros != null) {
+            for (Retro retro : pastRetros) {
+                List<ActionItem> items = retro.getActionItems();
+                if (items != null) {
+                    total += items.size();
+                    completed += items.stream().filter(ActionItem::isCompleted).count();
+                }
+            }
+        }
+
+        return total == 0 ? 0.0 : (double) completed / total;
+    }
+
+    private int countDiscussionEntries(Retro retro) {
+        if (retro.getFeedbackPoints() == null) {
+            return 0;
+        }
+        int total = 0;
+        for (FeedbackPoint fp : retro.getFeedbackPoints()) {
+            if (fp.getDiscussions() != null) {
+                total += fp.getDiscussions().size();
+            }
+        }
+        return total;
     }
 
     private Retro fetchRetro(Long id) {
