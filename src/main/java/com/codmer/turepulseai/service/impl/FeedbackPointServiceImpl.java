@@ -139,7 +139,9 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                 });
 
         // Combine results
-        String finalSummary = currentSummary.thenCombine(historicalSummary, this::mergeFeedbackSummaries)
+        String feedbackType = currentPoint.getType().toString();
+        String finalSummary = currentSummary.thenCombine(historicalSummary,
+                        (current, historical) -> mergeFeedbackSummaries(current, historical, feedbackType))
                 .exceptionally(ex -> {
                     log.error("Error in merge summary task: {}", ex.getMessage());
                     return "Analysis completed with limitations. Please try again for full analysis.";
@@ -309,7 +311,7 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
         }
     }
 
-    private String mergeFeedbackSummaries(String currentSummary, String historicalSummary) {
+    private String mergeFeedbackSummaries(String currentSummary, String historicalSummary, String feedbackType) {
         int styleSeed = ThreadLocalRandom.current().nextInt(6);
         String openerStyleMode = switch (styleSeed) {
             case 0 -> "playful";
@@ -329,6 +331,12 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                 You are the Scrum Master who has been working with this team over past sprints.
                 Combine the current feedback analysis with historical patterns into a final response.
                 Requirements:
+                                                                - The feedback belongs to section: %s. Use this section explicitly while framing your response.
+                                                                - Section intent guide:
+                                                                    * LIKED: reinforce positives, behaviors to repeat, and momentum.
+                                                                    * LEARNED: highlight insight gained and how to apply it next sprint.
+                                                                    * LACKED: acknowledge gap, likely blockers, and concrete corrective step.
+                                                                    * LONGED_FOR: reflect unmet need and practical way to introduce/support it.
                                 - Infer the dominant emotion first (joy, pride, relief, excitement, gratitude, concern, frustration, fatigue, tension, uncertainty) and match your opener to it.
                                 - Start with a feeling-based opener that matches the emotion in the feedback.
                                 - For positives, rotate from options like: "Yay, that's a big win!", "Woohoo, this is real momentum!", "What a fantastic milestone!", "I'm genuinely impressed...", "This is a proud moment...", "Such inspiring teamwork!", "What a breakthrough!", "This really energizes the team!", "I'm thrilled to see...", "This is a big win!", "What a creative solution!", "You all should feel proud!", "Love this progress!", "Brilliant execution here!", "That is seriously solid teamwork.", "What a strong step forward!", "This is the kind of progress we needed.", "Huge credit to the team on this one.", "This is exciting to see.", "Now this is a confidence boost!", "Great signal that the team is leveling up.", "This is a meaningful achievement.", "Outstanding follow-through.", "This is exactly the momentum we want.", "What a sharp improvement!".
@@ -342,11 +350,13 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                                     whether it is recurring/improving, and the most practical next step.
                                 - Add one concise coaching tip framed as collaborative guidance ("let's", "we can", "try").
                                 - Keep it to 1-2 lines, human, direct, and conversational. Do not mention AI or models.
-                """;
+                """.formatted(feedbackType);
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
+            "Feedback Type Section: " + feedbackType +
+            "\n\n" +
                 "Current Analysis:\n" + currentSummary + "\n\nHistorical Analysis:\n" + historicalSummary +
             "\n\nOpener style mode for this response: " + openerStyleMode +
             " | Casualness: " + casualnessLevel +

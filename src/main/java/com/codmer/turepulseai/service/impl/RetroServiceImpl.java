@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -352,23 +353,24 @@ public class RetroServiceImpl implements RetroService {
 
     private String summarizeCurrentRetroInternal(Retro retro, String context) {
         String systemPrompt = """
-                You are a senior Scrum Master and retrospective facilitator.
-                Analyze the current sprint retro feedback and action items.
-                Produce a concise summary that covers:
-                - How the team did overall this sprint
+                You are a senior Scrum Master and retrospective facilitator opening a live retro meeting.
+                Analyze the current sprint feedback, discussions, and action items with a human tone.
+                Write as if you are speaking to the team in the room, not writing a formal report.
+                Include:
+                - Team pulse this sprint (overall mood and performance)
                 - What went well (LIKED) and what was learned (LEARNED)
-                - Where the team lacked (LACKED) and what they longed for (LONGED_FOR)
-                - Appreciation received and completion of action items
-                - Where the team is lacking and what to improve next sprint
-                Mention standout team members if their names appear in action items or discussions.
-                Keep it brief and precise.
+                - Where the team struggled (LACKED) and what they needed (LONGED_FOR)
+                - Appreciation moments and action-item follow-through
+                - One practical focus area for next sprint
+                Mention standout contributors only if clearly supported by context.
+                Keep it concise, specific, and natural. Do not mention AI or models.
                 """;
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Current Retro ID: " + retro.getId() + "\n" + context +
-                        "\nSummarize the current sprint in 2-3 short paragraphs."));
+                "\nSummarize the current sprint in 2 short paragraphs with a warm, human facilitator voice."));
 
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();
@@ -403,17 +405,18 @@ public class RetroServiceImpl implements RetroService {
 
         String systemPrompt = """
                 You are a senior Scrum Master reviewing historical retrospectives.
-                Identify patterns, improvement trends, and recurring gaps across past sprints.
-                Comment on how the team is improving, how they are tackling action items,
-                and highlight any persistent issues that need focus.
-                Provide a concise history-based assessment.
+            Identify patterns, improvement trends, and recurring gaps across past sprints.
+            Highlight emotional and behavioral patterns too (confidence, ownership, fatigue, alignment).
+            Comment on how the team is improving, how they are tackling action items,
+            and which persistent issues still deserve focus.
+            Provide a concise, practical history-based assessment in human language.
                 """;
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Scrum Master: " + scrumMasterUserName + "\n" + history +
-                        "\nSummarize historical patterns in 4-6 sentences."));
+                "\nSummarize historical patterns in 4-6 sentences. Include trend direction, recurring friction, and one practical lesson to carry into this retro."));
 
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();
@@ -426,22 +429,36 @@ public class RetroServiceImpl implements RetroService {
     }
 
     private String mergeSummariesInternal(String currentSummary, String historicalSummary) {
+        int kickoffSeed = ThreadLocalRandom.current().nextInt(6);
+        String kickoffTone = switch (kickoffSeed) {
+            case 0 -> "playful";
+            case 1 -> "warm";
+            case 2 -> "reflective";
+            case 3 -> "celebratory";
+            case 4 -> "steady";
+            default -> "energizing";
+        };
+
         String systemPrompt = """
-                You are a senior retrospective facilitator.
-                Combine the current sprint summary and historical patterns into a single final insight.
-                Produce 3-4 lines that cover:
-                - Overall sprint performance and key feedback (LIKED, LEARNED, LACKED, LONGED_FOR)
-                - Action item completion and appreciation
-                - Historical trend and improvement direction
-                - Key people doing well (if mentioned)
-                Avoid repetition and keep the response concise.
+                You are a senior retrospective facilitator opening the retro meeting.
+                Combine the current sprint summary and historical patterns into a kickoff summary the team will hear before discussion starts.
+                Start with a feeling-based opener that matches team mood.
+                You may use natural conversational openers when suitable: "Yay, ...", "Hmm, ...", "Ah, ...", "Oof, ...", "Nice, ...", "Alright, ...", "Phew, ...", "Wow, ...", "Okay team, ...".
+                Produce 3-4 concise lines that cover:
+                - Overall sprint pulse and key feedback (LIKED, LEARNED, LACKED, LONGED_FOR)
+                - Action-item follow-through and appreciation moments
+                - Historical trend and whether the team is improving or repeating patterns
+                - One clear focus for this retro conversation (next best discussion target)
+                Keep it human, direct, and spoken-language friendly.
+                Avoid robotic or repetitive phrasing. Do not mention AI or models.
                 """;
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Current Summary:\n" + currentSummary + "\n\nHistorical Summary:\n" + historicalSummary +
-                        "\n\nGenerate final 2-3 line summary."));
+                "\n\nKickoff tone mode: " + kickoffTone +
+                "\nGenerate final 2-3 line kickoff summary for the retro meeting."));
 
         var response = chatClient.prompt(new org.springframework.ai.chat.prompt.Prompt(messages)).call();
         String content = response.content();
