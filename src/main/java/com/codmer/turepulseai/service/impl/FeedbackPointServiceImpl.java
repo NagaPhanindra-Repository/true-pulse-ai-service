@@ -22,6 +22,7 @@ import com.codmer.turepulseai.entity.Discussion;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -258,15 +259,17 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                 You are the Scrum Master who has been working with this team across multiple sprints.
                 Analyze the CURRENT feedback point and its discussions.
                 Identify whether the feedback is appreciation or a concern.
+                Infer the dominant emotion (e.g., pride, excitement, concern, frustration, fatigue) from wording and context.
                 Explain likely root causes, team dynamics, and immediate next-step actions.
                 Offer concise coaching suggestions and recognize team effort if appreciation is present.
-                Write in a human, empathetic tone. Do not mention AI or that you are a model.
+                Use natural, human language and avoid repetitive sentence starters.
+                Do not mention AI or that you are a model.
                 """;
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
-                context + "\nSummarize current feedback in 5-7 sentences."));
+            context + "\nSummarize current feedback in 5-7 sentences. Include: emotion, appreciation/concern classification, key evidence, and immediate next action."));
 
         try {
             String content = rateLimitHandler.executeWithRateLimitRetry(() -> {
@@ -285,12 +288,14 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
                 You are a senior Scrum Master reviewing historical retrospectives.
                 Identify if the feedback pattern is recurring, how the team addressed it in the past,
                 and whether the issue is improving or persisting. Extract practical lessons learned.
+                Highlight one concrete pattern shift (better, same, or worse) and why.
+                Keep wording concise, specific, and non-repetitive.
                 """;
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
-                history + "\nSummarize historical patterns in 4-6 sentences."));
+            history + "\nSummarize historical patterns in 4-6 sentences. Include: recurrence level, previous handling, trend direction, and one practical lesson."));
 
         try {
             String content = rateLimitHandler.executeWithRateLimitRetry(() -> {
@@ -305,24 +310,47 @@ public class FeedbackPointServiceImpl implements FeedbackPointService {
     }
 
     private String mergeFeedbackSummaries(String currentSummary, String historicalSummary) {
+        int styleSeed = ThreadLocalRandom.current().nextInt(6);
+        String openerStyleMode = switch (styleSeed) {
+            case 0 -> "playful";
+            case 1 -> "warm";
+            case 2 -> "reflective";
+            case 3 -> "celebratory";
+            case 4 -> "steady-coaching";
+            default -> "energizing";
+        };
+        String casualnessLevel = switch (styleSeed % 3) {
+            case 0 -> "low";
+            case 1 -> "medium";
+            default -> "high";
+        };
+
         String systemPrompt = """
                 You are the Scrum Master who has been working with this team over past sprints.
                 Combine the current feedback analysis with historical patterns into a final response.
                 Requirements:
-                - Start with a feeling-based opener (e.g., "Yay...", "Great work...", "I appreciate..." for positives,
-                  or "I hear the frustration...", "I feel the strain..." for concerns).
-                - Do NOT start with "This feedback" and do not repeat the same sentence pattern each time.
-                - Cover whether this is appreciation or concern, how the team handled it before,
-                  whether it is recurring or improving, and clear guidance for next steps.
-                - Try for a suggestion or coaching tip that can help in tackling it.
-                - Keep it to 3-4 lines, human and direct. Do not mention AI or models.
+                                - Infer the dominant emotion first (joy, pride, relief, excitement, gratitude, concern, frustration, fatigue, tension, uncertainty) and match your opener to it.
+                                - Start with a feeling-based opener that matches the emotion in the feedback.
+                                - For positives, rotate from options like: "Yay, that's a big win!", "Woohoo, this is real momentum!", "What a fantastic milestone!", "I'm genuinely impressed...", "This is a proud moment...", "Such inspiring teamwork!", "What a breakthrough!", "This really energizes the team!", "I'm thrilled to see...", "This is a big win!", "What a creative solution!", "You all should feel proud!", "Love this progress!", "Brilliant execution here!", "That is seriously solid teamwork.", "What a strong step forward!", "This is the kind of progress we needed.", "Huge credit to the team on this one.", "This is exciting to see.", "Now this is a confidence boost!", "Great signal that the team is leveling up.", "This is a meaningful achievement.", "Outstanding follow-through.", "This is exactly the momentum we want.", "What a sharp improvement!".
+                                - For concerns, rotate from options like: "Hmm, I can feel the tension here...", "Oof, this sounds heavy...", "I sense the challenge here...", "This must feel tough...", "I can see the frustration...", "Let's acknowledge the struggle...", "This is a real hurdle...", "I hear the concern...", "It's okay to feel this way...", "This is a tough spot...", "Let's work through this together...", "I appreciate the honesty here...", "I can feel the strain in this one.", "This is a tricky patch, and that's real.", "I hear the fatigue behind this.", "This friction is important to surface.", "That's a tough pattern to carry sprint after sprint.", "This pain point deserves focused attention.", "I can see why this feels draining.", "This is hard, and you're naming it clearly.", "Let's slow this down and unpack it.", "This concern is valid and worth addressing.", "I hear both effort and frustration here.", "This is exactly the kind of issue retros should surface.", "That's a meaningful warning sign for the team.".
+                                - For mixed emotions (progress + pain), use openers like: "Ah, good progress with a clear challenge still in play...", "Phew, we moved forward but there's still pressure here...", "Alright, this is better, and we still have work to do...", "Nice, we can see improvement and one stubborn gap...", "Hey, this is encouraging while still highlighting a risk...", "Okay, this is a step up with one friction point to resolve...".
+                                - Also allow lively human interjections when natural: "Yay, ...", "Hmm, ...", "Ah, ...", "Ahh, ...", "Oof, ...", "Woohoo, ...", "Hey, ...", "Nice, ...", "Alright, ...", "Alrighty, ...", "Phew, ...", "Wow, ...", "Okay, ...", "Right, ...", "Honestly, ...", "Look, ...", "Love this, ...", "Good sign, ...", "Fair point, ...", "Totally hear that, ...".
+                                - Use a fresh opener each time and vary sentence rhythm. Avoid repeating the same first 2-3 words.
+                                - Do NOT start with "This feedback" and avoid repeatedly starting with generic concern words.
+                                - Avoid cliches and robotic templates; sound like a real facilitator speaking in a live retro.
+                                - Clearly cover: whether this is appreciation or concern, how the team handled it before,
+                                    whether it is recurring/improving, and the most practical next step.
+                                - Add one concise coaching tip framed as collaborative guidance ("let's", "we can", "try").
+                                - Keep it to 1-2 lines, human, direct, and conversational. Do not mention AI or models.
                 """;
 
         List<org.springframework.ai.chat.messages.Message> messages = new java.util.ArrayList<>();
         messages.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
         messages.add(new org.springframework.ai.chat.messages.UserMessage(
                 "Current Analysis:\n" + currentSummary + "\n\nHistorical Analysis:\n" + historicalSummary +
-                        "\n\nGenerate final summary in 1-2 lines."));
+            "\n\nOpener style mode for this response: " + openerStyleMode +
+            " | Casualness: " + casualnessLevel +
+            "\nGenerate final summary in 1-2 lines with varied wording and a non-repetitive opener."));
 
         try {
             String content = rateLimitHandler.executeWithRateLimitRetry(() -> {
