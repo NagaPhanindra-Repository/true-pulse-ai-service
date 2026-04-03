@@ -45,6 +45,9 @@ public class RetroDetailDto {
         private String description;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        private long likes;
+        private long dislikes;
+        private String userVote;
 
         // Nested discussions
         private List<DiscussionDetailDto> discussions;

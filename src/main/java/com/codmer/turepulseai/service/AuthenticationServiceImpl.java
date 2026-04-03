@@ -9,14 +9,20 @@ import com.codmer.turepulseai.repository.UserRepository;
 import com.codmer.turepulseai.util.Gender;
 import com.codmer.turepulseai.util.JwtTokenProvider;
 import com.codmer.turepulseai.util.UserType;
+
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -101,5 +107,31 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         verificationSessionService.consumeSession(createUserDto.getVerificationSessionId());
         verificationService.markUserAsVerified(saved.getUserName());
         return saved;
+    }
+
+    @Override
+    public Optional<User> extractUserFromCurrentRequestToken() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            return Optional.empty();
+        }
+
+        HttpServletRequest request = attrs.getRequest();
+        if (request == null) {
+            return Optional.empty();
+        }
+
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Optional.empty();
+        }
+
+        String token = authHeader.substring(7);
+        if (!jwtTokenProvider.validateToken(token)) {
+            return Optional.empty();
+        }
+
+        String username = jwtTokenProvider.getUsername(token);
+        return userRepository.findByUserName(username);
     }
 }

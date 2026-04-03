@@ -6,10 +6,12 @@ import com.codmer.turepulseai.model.RetroAnalysisResponse;
 import com.codmer.turepulseai.entity.Retro;
 import com.codmer.turepulseai.entity.User;
 import com.codmer.turepulseai.entity.FeedbackPoint;
+import com.codmer.turepulseai.entity.FeedbackVote;
 import com.codmer.turepulseai.entity.Discussion;
 import com.codmer.turepulseai.entity.ActionItem;
 import com.codmer.turepulseai.repository.RetroRepository;
 import com.codmer.turepulseai.repository.UserRepository;
+import com.codmer.turepulseai.service.AuthenticationService;
 import com.codmer.turepulseai.service.RetroService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class RetroServiceImpl implements RetroService {
 
     private final RetroRepository retroRepository;
     private final UserRepository userRepository;
+    private final AuthenticationService authenticationService;
     private final org.springframework.ai.chat.client.ChatClient chatClient;
     private final Executor aiAnalysisExecutor;
 
@@ -44,10 +47,11 @@ public class RetroServiceImpl implements RetroService {
         Retro retro = retroRepository.findById(retroId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Retro not found"));
 
-        return toDetailDto(retro);
+        User currentUser = authenticationService.extractUserFromCurrentRequestToken().orElse(null);
+        return toDetailDto(retro, currentUser);
     }
 
-    private RetroDetailDto toDetailDto(Retro retro) {
+    private RetroDetailDto toDetailDto(Retro retro, User currentUser) {
         RetroDetailDto dto = new RetroDetailDto();
         dto.setId(retro.getId());
         dto.setTitle(retro.getTitle());
@@ -61,7 +65,7 @@ public class RetroServiceImpl implements RetroService {
         if (retro.getFeedbackPoints() != null && !retro.getFeedbackPoints().isEmpty()) {
             List<RetroDetailDto.FeedbackPointDetailDto> feedbackDtos = retro.getFeedbackPoints()
                     .stream()
-                    .map(this::toFeedbackPointDetailDto)
+                    .map(fp -> toFeedbackPointDetailDto(fp, currentUser))
                     .collect(Collectors.toList());
             dto.setFeedbackPoints(feedbackDtos);
         } else {
@@ -83,13 +87,29 @@ public class RetroServiceImpl implements RetroService {
         return dto;
     }
 
-    private RetroDetailDto.FeedbackPointDetailDto toFeedbackPointDetailDto(FeedbackPoint fp) {
+    private RetroDetailDto.FeedbackPointDetailDto toFeedbackPointDetailDto(FeedbackPoint fp, User currentUser) {
         RetroDetailDto.FeedbackPointDetailDto dto = new RetroDetailDto.FeedbackPointDetailDto();
         dto.setId(fp.getId());
         dto.setType(fp.getType().toString());
         dto.setDescription(fp.getDescription());
         dto.setCreatedAt(fp.getCreatedAt());
         dto.setUpdatedAt(fp.getUpdatedAt());
+
+        List<FeedbackVote> votes = fp.getFeedbackVotes() == null ? List.of() : fp.getFeedbackVotes();
+        long likes = votes.stream().filter(v -> v.getVoteType() == FeedbackVote.VoteType.LIKE).count();
+        long dislikes = votes.stream().filter(v -> v.getVoteType() == FeedbackVote.VoteType.DISLIKE).count();
+        dto.setLikes(likes);
+        dto.setDislikes(dislikes);
+        if (currentUser != null) {
+            String userVote = votes.stream()
+                    .filter(v -> v.getUser() != null && currentUser.getId().equals(v.getUser().getId()))
+                    .map(v -> v.getVoteType().toString())
+                    .findFirst()
+                    .orElse(null);
+            dto.setUserVote(userVote);
+        } else {
+            dto.setUserVote(null);
+        }
 
         // Map nested discussions with user details
         if (fp.getDiscussions() != null && !fp.getDiscussions().isEmpty()) {
@@ -104,6 +124,8 @@ public class RetroServiceImpl implements RetroService {
 
         return dto;
     }
+
+
 
     private RetroDetailDto.DiscussionDetailDto toDiscussionDetailDto(Discussion discussion) {
         RetroDetailDto.DiscussionDetailDto dto = new RetroDetailDto.DiscussionDetailDto();
